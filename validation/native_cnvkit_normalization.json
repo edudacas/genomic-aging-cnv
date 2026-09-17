@@ -1,0 +1,28 @@
+{
+  "status": "REAL_CNVKIT_NORMALIZATION_CBS_SMOKE_PASS",
+  "date": "2026-09-16",
+  "user_authorized_isolated_install": true,
+  "python_environment": "/tmp/cnv-native-deps.An66yG/python",
+  "r_library": "/tmp/cnv-native-deps.An66yG/R-library",
+  "cnvkit_version": "0.9.12",
+  "pysam_version": "0.23.3",
+  "DNAcopy_version": "1.86.0",
+  "python_dependencies": "native_python_20260916.freeze.txt",
+  "test_script_sha256": "6acedc9131f01c3e5f469ec861d5ab46f8838af7b0efda4343c1ba497b02a342",
+  "stages": ["coverage", "verified_reference_build", "verified_normalization", "CBS"],
+  "modes": [
+    {"off_target": false, "bins": 100, "loss_log2_median": -1.0, "neutral_log2_median": 0.0, "status": "PASS"},
+    {"off_target": true, "bins": 200, "loss_log2_median": -1.0, "neutral_log2_median": 0.0, "status": "PASS"}
+  ],
+  "reference_normals": 1,
+  "reference_sufficient_for_study": false,
+  "synthetic_inputs_only": true,
+  "sensitivity_calibrated": false,
+  "facets_concordance_measured": false,
+  "sex_chromosome_policy_validated": false,
+  "CBS_runtime_fully_fingerprinted": false,
+  "system_or_server_modified": false,
+  "full_pipeline_validated": false,
+  "test_count": 155,
+  "tests_passed": 155
+}

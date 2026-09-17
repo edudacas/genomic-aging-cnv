@@ -1,0 +1,38 @@
+{
+  "status": "ISOLATED_INSTALL_AND_SYNTHETIC_TESTS_PASS",
+  "date": "2026-09-16",
+  "user_authorized": true,
+  "root": "/tmp/cnv-native-deps.An66yG",
+  "system_packages_modified": false,
+  "server_or_cohort_launched": false,
+  "python": {"version": "3.12", "pyarrow": "25.0.1"},
+  "r": {
+    "version": "4.6.1",
+    "facetsCH": "0.0.1",
+    "pctGCdata": "0.3.0",
+    "DNAcopy": "1.86.0",
+    "data.table": "1.18.6.1",
+    "argparse": "2.3.1",
+    "R.utils": "2.13.0"
+  },
+  "source_archives": {
+    "facets_commit": "696113be3e31dedde130d46be0c9b2b89c41499b",
+    "facets_archive_sha256": "44a99c0e9102785d8fc3b001ec4f25735be47405159a1cbc52b7aa25c0ade6c0",
+    "pctGCdata_commit": "a7385f38783ee0b2acfefe479a64550148927b45",
+    "pctGCdata_archive_sha256": "23c2785489c28c6a880777e2050795d464638297cdea8eab90e1535ba37acc98"
+  },
+  "source_packaging_repair": "Temporary FACETS source DESCRIPTION Package changed from FACETS-CH to facetsCH to match NAMESPACE useDynLib and upstream CLI; no algorithm change.",
+  "adapter_fix": "Attach pctGCdata for native getGCpct build lookup, restoring prior search state on exit.",
+  "tests": {
+    "python_discovered": 148,
+    "python_passed": 148,
+    "python_skipped": 0,
+    "native_snp_pileup_synthetic": "PASS",
+    "native_dnacopy_two_segment_synthetic": "PASS",
+    "native_facets_grch38_synthetic": "PASS"
+  },
+  "mosaic_sensitivity_calibrated": false,
+  "complete_pipeline_validated": false,
+  "runtime_dependency_closure_frozen": false,
+  "note": "Temporary libraries may disappear. Existing system R dependencies were read, not upgraded. These are synthetic implementation tests, not study validation."
+}

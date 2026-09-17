@@ -1,0 +1,19 @@
+{
+  "status": "CNVKIT_CBS_STAGE_NATIVE_SMOKE_PASS",
+  "date": "2026-09-16",
+  "stage_sha256": "0c97ceeddfffb31026e8893b4b7b15a4a88a766c27be8a8aae8c795889829d8a",
+  "test_script_sha256": "edfa8892480cfa82250cab5a1586acaefd7e24da17989c3e75f31fb562fc9dda",
+  "native_orchestrator_tested": true,
+  "normalization_verified_before_and_after": true,
+  "reference_provenance_verified": true,
+  "explicit_R_runtime_fingerprinted": true,
+  "modes_passed": ["100_target_bins", "100_target_plus_100_antitarget_bins"],
+  "loss_log2_median": -1.0,
+  "neutral_log2_median": 0.0,
+  "unit_contract_tests_passed": 161,
+  "synthetic_inputs_only": true,
+  "sensitivity_calibrated": false,
+  "sex_chromosome_policy_validated": false,
+  "paired_caller_concordance_validated": false,
+  "full_pipeline_validated": false
+}

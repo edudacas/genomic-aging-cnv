@@ -1,0 +1,21 @@
+{
+  "status": "NATIVE_BUILD_AND_SYNTHETIC_SMOKE_PASS",
+  "upstream_repository": "papaemmelab/Gao_NC_CH",
+  "upstream_commit": "696113be3e31dedde130d46be0c9b2b89c41499b",
+  "upstream_directory": "facets-ch/inst/extcode",
+  "source_note": "Decoded pinned GitHub contents; trailing whitespace at EOF normalized when written.",
+  "source_sha256": {
+    "snp-pileup.cpp": "18e94ff3fddb6b504d1f5022cf2b0a91412d76fa88d920ab36330581130a3e79",
+    "snp-pileup.h": "c51c72ccf2d138c5cee3d1f5395e73b7f1a9c942b48717b2854561b1f9addda1"
+  },
+  "build_command": "g++ -O2 -o snp-pileup snp-pileup.cpp -lhts",
+  "htslib_version": "1.19",
+  "samtools_version": "1.19.2",
+  "binary_sha256": "f89300856b4b69f4cdffc1e1c915be46946470c72996f77783880a4ef69e75cc",
+  "temporary_executable": "/tmp/cnv-snp-pileup.ODBXqD/snp-pileup",
+  "test": "tests/native_pileup_smoke.py",
+  "cases": ["unpaired_reads", "fully_overlapping_proper_pairs"],
+  "verified": ["reference_alternate_counts", "error_only_observed_zero_allelic_depth", "pseudo_depth", "missing_locus_not_zero", "overlap_not_double_counted"],
+  "mosaic_sensitivity_measured": false,
+  "cohort_executed": false
+}

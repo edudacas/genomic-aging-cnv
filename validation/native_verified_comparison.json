@@ -1,0 +1,19 @@
+{
+  "status": "VERIFIED_NATIVE_CALLER_COMPARISON_PASS",
+  "date": "2026-09-16",
+  "directory": "/tmp/cnv-native-deps.An66yG/paired-verified-comparison",
+  "same_manifest_sample_bam_stratum_and_build_verified": true,
+  "native_inputs_and_outputs_rehashed": true,
+  "comparison_intervals": 6,
+  "comparison_status_counts": {
+    "CNVKIT_ONLY": 4,
+    "CONCORDANT_DIRECTION": 1,
+    "BOTH_WITHIN_DECLARED_LOGR_BAND": 1
+  },
+  "comparison_sha256": "ff67e714597ae878215b07825c7014776bd989b9eee4365332a894c8646db4cf",
+  "unit_contract_tests_passed": 170,
+  "synthetic_inputs_only": true,
+  "event_count_estimated": false,
+  "sensitivity_calibrated": false,
+  "full_pipeline_validated": false
+}

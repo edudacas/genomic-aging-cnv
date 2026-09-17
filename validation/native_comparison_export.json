@@ -1,0 +1,17 @@
+{
+  "status": "COMPARISON_CANDIDATE_EXPORT_PASS",
+  "date": "2026-09-16",
+  "source": "/tmp/cnv-native-deps.An66yG/paired-verified-comparison/comparison/COMPLETE.json",
+  "source_receipt_sha256": "aead52ec9823cdbbae2ebaddf0444ac289909a2ee05002cd39649f7dee2b104e",
+  "output": "/tmp/cnv-native-deps.An66yG/paired-verified-comparison/parquet",
+  "candidate_export_receipt_sha256": "a0fd473c87a32e9e0d17c758d4819043aa7c7804d608a99432e0d9f0b8a363aa",
+  "rows": 6,
+  "roundtrip_fields_match": true,
+  "comparison_payload_preserved": true,
+  "unit_contract_tests_passed": 176,
+  "synthetic_data_only": true,
+  "event_count_estimated": false,
+  "scientific_validation": false,
+  "deidentification_performed": false,
+  "full_pipeline_validated": false
+}

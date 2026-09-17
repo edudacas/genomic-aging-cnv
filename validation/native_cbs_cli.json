@@ -1,0 +1,14 @@
+{
+  "status": "CNVKIT_CBS_CLI_SMOKE_PASS",
+  "date": "2026-09-16",
+  "entrypoint": "cnv_cli.py run-cbs",
+  "explicit_execute_required": true,
+  "native_modes_passed": ["100_target_bins", "100_target_plus_100_antitarget_bins"],
+  "unit_contract_tests_passed": 164,
+  "native_reference_cli_tested": false,
+  "native_normalization_cli_tested": false,
+  "synthetic_inputs_only": true,
+  "sensitivity_calibrated": false,
+  "cohort_launched": false,
+  "full_pipeline_validated": false
+}

@@ -1,0 +1,18 @@
+{
+  "repository": "edudacas/genomic-aging-cnv",
+  "snapshot_date": "2026-09-17",
+  "source_component": "Genomic Aging LFS mosaic CNV/LOH development module",
+  "source_data_included": false,
+  "study_cohort_execution_included": false,
+  "synthetic_native_receipts_included": true,
+  "production_release": false,
+  "privacy_exclusions": [
+    "patient identifiers",
+    "FAP and clinical linkage",
+    "workbooks",
+    "BAM, CRAM, VCF and BCF files",
+    "cohort results",
+    "server configuration"
+  ],
+  "notes": "File-level SHA-256 values are recorded in SHA256SUMS. Cite the exact Git commit for review."
+}

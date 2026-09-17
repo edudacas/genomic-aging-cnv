@@ -1,0 +1,22 @@
+{
+  "status": "EXPLICIT_R_RUNTIME_CBS_SMOKE_PASS",
+  "date": "2026-09-16",
+  "test_script_sha256": "182831af282ef45c5884647dce1f8c459de03a4b2e9f904266d68f3d98e3c173",
+  "executor_sha256": "1ee10770bba0dcabe559f0f331aba7d648862e28d92404db61120d4dcf54c9b4",
+  "commands_sha256": "f936dbd7376f7eb4a0c8876ce7ca3e5b4dac833a03d4b5abbd24cb061327d438",
+  "cnvkit_version": "0.9.12",
+  "DNAcopy_version": "1.86.0",
+  "r_library": "/tmp/cnv-native-deps.An66yG/R-library",
+  "explicit_rscript_path": "/usr/bin/Rscript",
+  "r_library_files_fingerprinted_and_rechecked": true,
+  "r_startup_profiles_disabled": true,
+  "explicit_R_environment_in_task_fingerprint": true,
+  "parent_process_environment_modified": false,
+  "modes_passed": ["100_target_bins", "100_target_plus_100_antitarget_bins"],
+  "loss_log2_median": -1.0,
+  "neutral_log2_median": 0.0,
+  "unit_contract_tests_passed": 157,
+  "full_system_dependency_closure_verified": false,
+  "sensitivity_calibrated": false,
+  "study_or_server_executed": false
+}
