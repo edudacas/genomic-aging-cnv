@@ -1,0 +1,13 @@
+**
+!*.py
+!*.R
+!runtime/
+!runtime/**
+!tests/
+!tests/**
+!requirements-test.txt
+**/__pycache__
+**/*.pyc
+**/*.PRIVATE.*
+**/*.bam
+**/*.vcf

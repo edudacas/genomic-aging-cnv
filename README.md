@@ -11,15 +11,19 @@ This is a **development snapshot, not a production release**. No CNV/LOH
 cohort run has been launched for the 1,329 study samples from this code.
 
 With the pinned Python dependencies installed, the current portable regression
-suite contains 195 passing tests. Historical
+suite contains 206 passing tests. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
 retained under `validation/`. Those tests demonstrate implementation and file
 boundary behavior. They do not establish clinical validity, study sensitivity,
 specificity, a limit of detection or fitness of a study panel of normals.
 
-The isolated native runtime used for those tests was temporary and is not
-distributed here. Production readiness still requires a reproducible container,
+The original temporary runtime has been replaced locally by a persistent,
+isolated installation with fresh LOSS/GAIN/CNLOH integration tests. The runtime
+is still host-bound and is not distributed here. See
+[`docs/READINESS_20260918.md`](docs/READINESS_20260918.md) for the bootstrap,
+container build candidate, private inventory and QC collector.
+Production readiness still requires a validated frozen container,
 assay-matched resources and PoNs, real-BAM canaries, event-aware calibration and
 frozen classification thresholds. See `DEVELOPMENT_STATE.md`.
 

@@ -1,0 +1,31 @@
+{
+  "status": "IDEAL_NATIVE_EVENT_SIGNALS_PASS",
+  "events": {
+    "LOSS": {
+      "observed_log2_depth_delta": -0.403568847468875,
+      "expected_log2_depth_delta": -0.4150374992788438,
+      "observed_ln_alt_ref_delta": -0.690705176904394,
+      "expected_ln_alt_ref_delta": -0.6931471805599451,
+      "affected_loci": 150,
+      "neutral_loci": 449
+    },
+    "GAIN": {
+      "observed_log2_depth_delta": 0.301140395862838,
+      "expected_log2_depth_delta": 0.32192809488736235,
+      "observed_ln_alt_ref_delta": 0.40463745237592397,
+      "expected_ln_alt_ref_delta": 0.4054651081081642,
+      "affected_loci": 150,
+      "neutral_loci": 449
+    },
+    "CNLOH": {
+      "observed_log2_depth_delta": 0.0006672901432106335,
+      "expected_log2_depth_delta": 0.0,
+      "observed_ln_alt_ref_delta": -1.0953549567978,
+      "expected_ln_alt_ref_delta": -1.0986122886681098,
+      "affected_loci": 150,
+      "neutral_loci": 449
+    }
+  },
+  "clinical_event_classification_validated": false,
+  "sensitivity_calibrated": false
+}

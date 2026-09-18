@@ -1,0 +1,27 @@
+{
+  "status": "NATIVE_SYNTHETIC_SUITE_PASS",
+  "tests": {
+    "portable": {
+      "exit_code": 0,
+      "log_sha256": "6d422bf0e1815fc60678787cd555c0ed041f18d3d753fdad2fb9f1a9d2229a3c"
+    },
+    "LOSS": {
+      "exit_code": 0,
+      "log_sha256": "6345932646e3b9eb732d1e45dc346fd1e49ff7a63519b31da1e5ce0cdcaf57ed",
+      "receipt_sha256": "b0fbd6bbfe23d16551145d5dfbe75845410305503879f19ffe3c00ffdc4a66c1"
+    },
+    "GAIN": {
+      "exit_code": 0,
+      "log_sha256": "dd4142a90427c9b7c778ff1b3758fd3628a27b55f72b5b44562f489677b5c35d",
+      "receipt_sha256": "ca10c598ab571f632cd0fc9d14e373d51005c3342992751f59673a496971c4a2"
+    },
+    "CNLOH": {
+      "exit_code": 0,
+      "log_sha256": "85e92574130fd315949d8dea2e3946ba535862183481301d92267377dca6d35e",
+      "receipt_sha256": "d762ee5f5c70c6ec3b9489a2340eafae6aa189ce197891d98db5194f5f958f2a"
+    }
+  },
+  "container_validated": false,
+  "study_sensitivity_calibrated": false,
+  "cohort_executed": false
+}
