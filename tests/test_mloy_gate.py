@@ -52,8 +52,11 @@ class MloyGateTests(unittest.TestCase):
         case = next(row for row in rows if row["study_group"] == "LFS_R337H")
         self.assertLess(case["mLRR_Y"], -0.9)
         self.assertGreater(case["f_LOY_interpretive"], 0.45)
+        self.assertEqual(case["screen_tier_LOY"], "EXTREME_CANDIDATE_UNCALIBRATED")
+        self.assertGreater(case["fraction_targets_below_control"], 0.0)
         self.assertEqual(case["event_call_LOY"], "NOT_CALIBRATED")
         self.assertFalse(summary["event_calls_emitted"])
+        self.assertFalse(summary["negative_calls_emitted"])
 
     def test_missing_collection_sample_fails(self):
         collection, sex, metadata = self.fixture()
@@ -70,6 +73,37 @@ class MloyGateTests(unittest.TestCase):
         self.assertEqual(case["metric_status"], "Y_SIGNAL_ABSENT_MANUAL_REVIEW")
         self.assertEqual(case["screen_flag_LOY"], "Y_SIGNAL_ABSENT_MANUAL_REVIEW")
         self.assertEqual(case["event_call_LOY"], "NOT_CALIBRATED")
+
+    def test_borderline_signal_is_retained_not_negative(self):
+        collection, sex, metadata = self.fixture()
+        collection["samples"][-1]["eligible_y_intervals"]["chrY:10-110"] = interval(0.47)
+        rows, _, _ = build_gate(collection, sex, metadata)
+        case = next(row for row in rows if row["study_group"] == "LFS_R337H")
+        self.assertEqual(case["screen_tier_LOY"], "BORDERLINE_CANDIDATE_UNCALIBRATED")
+        self.assertNotIn("NEGATIVE", case["screen_tier_LOY"])
+
+    def test_sex_gate_hold_is_retained_for_anomaly_review(self):
+        collection, sex, metadata = self.fixture()
+        collection["samples"].append({
+            "sample_id": "SX",
+            "eligible_y_intervals": {
+                "chrY:10-110": interval(0.40),
+                "chrY:200-300": interval(0.40, covered_fraction=0.0),
+            },
+        })
+        collection["selected_samples"] += 1
+        sex.append({
+            "sample_id": "SX", "analysis_id": "X",
+            "sex_inferred": None, "sex_gate_status": "HOLD",
+            "sex_reported": "Unknown", "proposed_capture_family": "A",
+            "batch_id": "B", "batch_name": "batch",
+        })
+        metadata["X"] = {"age_at_collection": 50, "study_group": "TP53_negative"}
+        rows, summary, _ = build_gate(collection, sex, metadata)
+        case = next(row for row in rows if row["sample_id"] == "SX")
+        self.assertEqual(case["screen_tier_LOY"], "SEX_CHROMOSOME_ANOMALY_REVIEW")
+        self.assertFalse(case["mloy_reference_eligible"])
+        self.assertEqual(summary["sex_chromosome_anomaly_review_samples"], 1)
 
 
 if __name__ == "__main__":

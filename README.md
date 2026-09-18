@@ -11,7 +11,8 @@ This is a **development snapshot, not a production release**. No CNV/LOH
 cohort run has been launched for the 1,329 study samples from this code.
 
 With the pinned Python dependencies installed, the current portable regression
-suite contains 206 passing tests. Historical
+suite contains 224 passing tests, with 11 optional skips in the currently
+available environment. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
 retained under `validation/`. Those tests demonstrate implementation and file
@@ -61,6 +62,10 @@ somatic origin or a TP53 second hit.
   ideal diploid mixture expectations and calibration accounting.
 - `cnv_regions.py`, `cnv_phase_*.py`, `cnv_manta.py`: regional, fragment and
   exploratory SV evidence.
+- `collect_mloy_intervals.py`, `mloy_gate.py`: verified Y interval collection
+  and sensitive, non-negative mLOY screening.
+- `collect_mlox_intervals.py`, `mlox_gate.py`: verified X non-PAR/non-XTR
+  interval collection and sensitive, non-negative mLOX screening.
 - `tests/`: synthetic unit, contract and optional native smoke tests.
 - `validation/`: historical synthetic native-test receipts; no patient data.
 

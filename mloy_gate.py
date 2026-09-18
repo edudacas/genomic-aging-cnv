@@ -18,12 +18,16 @@ from pathlib import Path
 from typing import Any
 
 
-GATE_VERSION = "mloy-callable-y-v1"
+GATE_VERSION = "mloy-sensitive-retention-v2"
 CALLABLE_BASE_FRACTION = 0.80
 CALLABLE_SAMPLE_FRACTION = 0.95
 CALLABLE_DEPTH_THRESHOLD = 20
 MIN_RUN_CONTROLS = 5
 MIN_SAMPLE_PANEL_COMPLETENESS = 0.95
+EXTREME_MIN_INTERPRETIVE_FRACTION = 0.10
+BORDERLINE_MIN_INTERPRETIVE_FRACTION = 0.05
+WEAK_SIGNAL_SIGMA = 2.0
+EXTREME_SIGNAL_SIGMA = 3.0
 
 
 def sha256_file(path: Path) -> str:
@@ -78,9 +82,12 @@ def build_gate(
     if len(sex) != len(sex_rows) or set(sex) != set(collected):
         raise ValueError("sex-gate/collection sample mismatch")
 
-    males: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     for sample_id, row in sorted(sex.items()):
-        if row.get("sex_inferred") != "Male" or row.get("sex_gate_status") != "PASS":
+        reported_male = row.get("sex_reported") == "Male"
+        inferred_male = row.get("sex_inferred") == "Male"
+        anomaly_review = row.get("sex_gate_status") != "PASS" or row.get("sex_inferred") is None
+        if not (reported_male or inferred_male or anomaly_review):
             continue
         analysis_id = str(row.get("analysis_id"))
         if analysis_id not in metadata:
@@ -91,7 +98,7 @@ def build_gate(
         group = metadata[analysis_id].get("study_group")
         if not group:
             raise ValueError(f"{sample_id}: study_group missing")
-        males.append(
+        candidates.append(
             {
                 "sample_id": sample_id,
                 "analysis_id": analysis_id,
@@ -102,14 +109,18 @@ def build_gate(
                 "sex_inferred": row["sex_inferred"],
                 "study_group": group,
                 "age_at_collection": float(age),
+                "mloy_reference_eligible": bool(
+                    row.get("sex_gate_status") == "PASS" and (reported_male or inferred_male)
+                ),
+                "sex_chromosome_anomaly_review": bool(anomaly_review),
                 "collection": collected[sample_id],
             }
         )
-    if not males:
-        raise ValueError("no eligible male samples")
+    if not candidates:
+        raise ValueError("no mLOY candidates or sex-chromosome anomaly reviews")
 
     by_assay: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in males:
+    for row in candidates:
         by_assay[row["assay"]].append(row)
 
     panel_receipt: dict[str, Any] = {
@@ -117,13 +128,18 @@ def build_gate(
         "gate_version": GATE_VERSION,
         "callability_rule": {
             "per_sample_interval_rule": f"bases_ge_{CALLABLE_DEPTH_THRESHOLD}/territory_bases >= {CALLABLE_BASE_FRACTION}",
-            "cohort_rule": f"per-sample rule true in >= {CALLABLE_SAMPLE_FRACTION} of eligible males within assay",
+            "cohort_rule": f"per-sample rule true in >= {CALLABLE_SAMPLE_FRACTION} of reference-eligible males within assay",
             "sample_metric": "median(log2(interval_mean_depth/autosomal_mean_depth))",
+            "zero_aware_metric": "log2(territory-weighted mean interval depth/autosomal depth), including zero-depth intervals",
             "minimum_sample_panel_completeness": MIN_SAMPLE_PANEL_COMPLETENESS,
         },
         "normalization_rule": (
             "TP53-negative male batch median when >=5 eligible controls; "
             "otherwise TP53-negative male assay median"
+        ),
+        "retention_policy": (
+            "sex inference never removes reported males or sex-chromosome anomalies; "
+            "no sample is labeled negative before calibration"
         ),
         "event_call_policy": "BLOCKED_PENDING_BAM_DOWNSAMPLING_CALIBRATION",
         "assays": {},
@@ -131,14 +147,17 @@ def build_gate(
 
     output_rows: list[dict[str, Any]] = []
     for assay, assay_rows in sorted(by_assay.items()):
-        interval_sets = [set(row["collection"]["eligible_y_intervals"]) for row in assay_rows]
+        reference_rows = [row for row in assay_rows if row["mloy_reference_eligible"]]
+        if not reference_rows:
+            raise ValueError(f"{assay}: no reference-eligible males")
+        interval_sets = [set(row["collection"]["eligible_y_intervals"]) for row in reference_rows]
         if any(values != interval_sets[0] for values in interval_sets[1:]):
             raise ValueError(f"{assay}: interval membership differs across samples")
         interval_ids = sorted(interval_sets[0])
         selected: list[str] = []
         interval_stats: list[dict[str, Any]] = []
         for interval_id in interval_ids:
-            values = [row["collection"]["eligible_y_intervals"][interval_id] for row in assay_rows]
+            values = [row["collection"]["eligible_y_intervals"][interval_id] for row in reference_rows]
             territory = int(values[0]["territory_bases"])
             if any(int(value["territory_bases"]) != territory for value in values):
                 raise ValueError(f"{assay}/{interval_id}: territory mismatch")
@@ -155,7 +174,7 @@ def build_gate(
                     "interval_id": interval_id,
                     "territory_bases": territory,
                     "callable_male_n": callable_n,
-                    "eligible_male_n": len(values),
+                    "reference_male_n": len(values),
                     "callable_male_fraction": fraction,
                     "selected": is_selected,
                 }
@@ -171,9 +190,21 @@ def build_gate(
                 if float(values[interval_id]["depth_over_autosome"]) > 0
             ]
             completeness = len(positive) / len(selected)
+            weighted_numerator = sum(
+                float(values[interval_id]["depth_over_autosome"])
+                * int(values[interval_id]["territory_bases"])
+                for interval_id in selected
+            )
+            weighted_denominator = sum(
+                int(values[interval_id]["territory_bases"]) for interval_id in selected
+            )
+            weighted_ratio = weighted_numerator / weighted_denominator
             row["callable_interval_n"] = len(selected)
             row["positive_interval_n"] = len(positive)
+            row["zero_interval_n"] = len(selected) - len(positive)
             row["panel_completeness"] = completeness
+            row["raw_y_auto_weighted_ratio"] = weighted_ratio
+            row["raw_log2_y_auto_weighted"] = math.log2(weighted_ratio) if weighted_ratio > 0 else None
             if not positive:
                 row["raw_log2_y_auto_median"] = None
                 row["metric_status"] = "Y_SIGNAL_ABSENT_MANUAL_REVIEW"
@@ -185,7 +216,10 @@ def build_gate(
                 row["metric_status"] = "ELIGIBLE"
 
         eligible = [row for row in assay_rows if row["metric_status"] == "ELIGIBLE"]
-        controls = [row for row in eligible if row["study_group"] == "TP53_negative"]
+        controls = [
+            row for row in eligible
+            if row["study_group"] == "TP53_negative" and row["mloy_reference_eligible"]
+        ]
         if len(controls) < 6:
             raise ValueError(f"{assay}: insufficient eligible TP53-negative male controls")
         assay_control_median = _median(
@@ -200,7 +234,15 @@ def build_gate(
             row["normalization_control_n"] = None
             row["normalization_median"] = None
             row["mLRR_Y"] = None
+            row["mLRR_Y_zero_aware"] = None
             row["f_LOY_interpretive"] = None
+            row["f_LOY_zero_aware_interpretive"] = None
+            row["target_residual_median"] = None
+            row["target_residual_q10"] = None
+            row["target_residual_q90"] = None
+            row["fraction_targets_below_control"] = None
+            row["fraction_targets_below_minus_0_05"] = None
+            row["fraction_targets_below_minus_0_10"] = None
             if row["metric_status"] != "ELIGIBLE":
                 continue
             batch_controls = controls_by_batch.get(row["batch_id"], [])
@@ -216,11 +258,53 @@ def build_gate(
                 scope = "ASSAY_TP53_NEGATIVE_MALES"
                 control_n = len(controls)
             mlrr = row["raw_log2_y_auto_median"] - baseline
+            weighted_baseline = _median(
+                [value["raw_log2_y_auto_weighted"] for value in (batch_controls if len(batch_controls) >= MIN_RUN_CONTROLS else controls)],
+                f"{assay}/{row['batch_id']} zero-aware controls",
+            )
+            zero_aware_mlrr = row["raw_log2_y_auto_weighted"] - weighted_baseline
             row["normalization_scope"] = scope
             row["normalization_control_n"] = control_n
             row["normalization_median"] = baseline
             row["mLRR_Y"] = mlrr
+            row["mLRR_Y_zero_aware"] = zero_aware_mlrr
             row["f_LOY_interpretive"] = max(0.0, min(1.0, 1.0 - 2.0**mlrr))
+            row["f_LOY_zero_aware_interpretive"] = max(
+                0.0, min(1.0, 1.0 - 2.0**zero_aware_mlrr)
+            )
+
+            interval_controls = batch_controls if len(batch_controls) >= MIN_RUN_CONTROLS else controls
+            residuals: list[float] = []
+            below_zero = below_005 = below_010 = 0
+            values = row["collection"]["eligible_y_intervals"]
+            for interval_id in selected:
+                observed = float(values[interval_id]["depth_over_autosome"])
+                reference = _median(
+                    [
+                        float(value["collection"]["eligible_y_intervals"][interval_id]["depth_over_autosome"])
+                        for value in interval_controls
+                    ],
+                    f"{assay}/{interval_id} controls",
+                )
+                if reference <= 0:
+                    raise ValueError(f"{assay}/{interval_id}: non-positive control median")
+                if observed > 0:
+                    residual = math.log2(observed / reference)
+                    residuals.append(residual)
+                    below_zero += residual < 0
+                    below_005 += residual < -0.05
+                    below_010 += residual < -0.10
+                else:
+                    below_zero += 1
+                    below_005 += 1
+                    below_010 += 1
+            ordered = sorted(residuals)
+            row["target_residual_median"] = statistics.median(residuals) if residuals else None
+            row["target_residual_q10"] = ordered[int(0.10 * (len(ordered) - 1))] if ordered else None
+            row["target_residual_q90"] = ordered[int(0.90 * (len(ordered) - 1))] if ordered else None
+            row["fraction_targets_below_control"] = below_zero / len(selected)
+            row["fraction_targets_below_minus_0_05"] = below_005 / len(selected)
+            row["fraction_targets_below_minus_0_10"] = below_010 / len(selected)
 
         young_n = math.ceil(len(controls) / 3)
         young = sorted(controls, key=lambda row: (row["age_at_collection"], row["sample_id"]))[:young_n]
@@ -230,27 +314,42 @@ def build_gate(
         robust_sigma = 1.4826 * null_mad
         if robust_sigma <= 0:
             raise ValueError(f"{assay}: degenerate young null")
-        screen_threshold = null_median - 3.0 * robust_sigma
+        weak_threshold = null_median - WEAK_SIGNAL_SIGMA * robust_sigma
+        extreme_threshold = null_median - EXTREME_SIGNAL_SIGMA * robust_sigma
 
         for row in assay_rows:
             row["young_null_median"] = null_median
             row["young_null_robust_sigma"] = robust_sigma
-            row["screen_threshold_3sigma"] = screen_threshold
-            row["screen_flag_LOY"] = "NOT_EVALUABLE"
+            row["weak_signal_threshold_2sigma"] = weak_threshold
+            row["extreme_signal_threshold_3sigma"] = extreme_threshold
+            row["screen_tier_LOY"] = "NOT_EVALUABLE_RETAINED"
             row["event_call_LOY"] = "NOT_CALIBRATED"
             if row["metric_status"] == "Y_SIGNAL_ABSENT_MANUAL_REVIEW":
-                row["screen_flag_LOY"] = "Y_SIGNAL_ABSENT_MANUAL_REVIEW"
+                tier = "Y_SIGNAL_ABSENT_MANUAL_REVIEW"
+            elif row["metric_status"] == "INCOMPLETE_Y_PANEL_HOLD":
+                tier = "TECHNICAL_NOT_EVALUABLE_RETAINED"
+            elif row["sex_chromosome_anomaly_review"]:
+                tier = "SEX_CHROMOSOME_ANOMALY_REVIEW"
             elif row["metric_status"] == "ELIGIBLE":
-                is_screen = (
-                    row["mLRR_Y"] < screen_threshold
-                    and row["f_LOY_interpretive"] >= 0.10
-                )
-                row["screen_flag_LOY"] = (
-                    "SCREEN_POSITIVE_UNCALIBRATED" if is_screen else "SCREEN_NEGATIVE_UNCALIBRATED"
-                )
+                if (
+                    row["mLRR_Y"] < extreme_threshold
+                    and row["f_LOY_interpretive"] >= EXTREME_MIN_INTERPRETIVE_FRACTION
+                ):
+                    tier = "EXTREME_CANDIDATE_UNCALIBRATED"
+                elif row["f_LOY_interpretive"] >= BORDERLINE_MIN_INTERPRETIVE_FRACTION:
+                    tier = "BORDERLINE_CANDIDATE_UNCALIBRATED"
+                elif row["mLRR_Y"] < weak_threshold:
+                    tier = "WEAK_SIGNAL_RETAINED"
+                else:
+                    tier = "WITHIN_REFERENCE_UNCALIBRATED"
+            else:
+                tier = "NOT_EVALUABLE_RETAINED"
+            row["screen_tier_LOY"] = tier
+            row["screen_flag_LOY"] = tier
 
         panel_receipt["assays"][assay] = {
-            "eligible_male_n": len(assay_rows),
+            "analysis_candidate_n": len(assay_rows),
+            "reference_male_n": len(reference_rows),
             "eligible_control_male_n": len(controls),
             "selected_interval_n": len(selected),
             "selected_territory_bases": sum(
@@ -262,7 +361,8 @@ def build_gate(
             "young_null_median": null_median,
             "young_null_mad": null_mad,
             "young_null_robust_sigma": robust_sigma,
-            "screen_threshold_3sigma": screen_threshold,
+            "weak_signal_threshold_2sigma": weak_threshold,
+            "extreme_signal_threshold_3sigma": extreme_threshold,
             "intervals": interval_stats,
         }
         output_rows.extend(assay_rows)
@@ -274,28 +374,37 @@ def build_gate(
         clean_rows.append(cleaned)
 
     statuses = Counter(row["metric_status"] for row in clean_rows)
-    screens = Counter(row["screen_flag_LOY"] for row in clean_rows)
-    screen_positive = [
-        row for row in clean_rows if row["screen_flag_LOY"] == "SCREEN_POSITIVE_UNCALIBRATED"
+    screens = Counter(row["screen_tier_LOY"] for row in clean_rows)
+    retained_candidates = [
+        row for row in clean_rows
+        if row["screen_tier_LOY"] in {
+            "EXTREME_CANDIDATE_UNCALIBRATED",
+            "BORDERLINE_CANDIDATE_UNCALIBRATED",
+            "WEAK_SIGNAL_RETAINED",
+        }
     ]
     summary = {
         "status": "MLOY_GATE_METRICS_COMPLETE_EVENT_CALLS_BLOCKED",
         "gate_version": GATE_VERSION,
-        "male_samples": len(clean_rows),
+        "mloy_analysis_samples": len(clean_rows),
+        "reference_male_samples": sum(row["mloy_reference_eligible"] for row in clean_rows),
+        "sex_chromosome_anomaly_review_samples": sum(
+            row["sex_chromosome_anomaly_review"] for row in clean_rows
+        ),
         "metric_status_counts": dict(sorted(statuses.items())),
-        "screen_flag_counts": dict(sorted(screens.items())),
-        "screen_positive_by_assay_and_group": {
+        "screen_tier_counts": dict(sorted(screens.items())),
+        "retained_candidate_by_assay_and_group": {
             f"{assay}|{group}": count
             for (assay, group), count in sorted(
-                Counter((row["assay"], row["study_group"]) for row in screen_positive).items()
+                Counter((row["assay"], row["study_group"]) for row in retained_candidates).items()
             )
         },
-        "screen_positive_age_range": (
+        "retained_candidate_age_range": (
             [
-                min(row["age_at_collection"] for row in screen_positive),
-                max(row["age_at_collection"] for row in screen_positive),
+                min(row["age_at_collection"] for row in retained_candidates),
+                max(row["age_at_collection"] for row in retained_candidates),
             ]
-            if screen_positive else None
+            if retained_candidates else None
         ),
         "manual_review_sample_ids": sorted(
             row["sample_id"]
@@ -311,6 +420,8 @@ def build_gate(
         "assay_counts": dict(sorted(Counter(row["assay"] for row in clean_rows).items())),
         "event_calls_emitted": False,
         "screening_is_not_an_event_call": True,
+        "negative_calls_emitted": False,
+        "borderline_signals_retained": True,
         "calibration_required": "BAM-level Y non-PAR downsampling by assay and depth",
         "collection_mask_sha256": collection["mask_sha256"],
     }

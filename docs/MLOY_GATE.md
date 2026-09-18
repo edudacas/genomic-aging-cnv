@@ -1,47 +1,53 @@
-# mLOY callable-panel gate
+# Sensitive mLOY screening gate
 
-`mloy_gate.py` freezes an assay-specific callable-Y panel and calculates the
-continuous mLRR-Y screening metric. It does not emit mLOY event calls.
+`mloy_gate.py` freezes an assay-specific callable-Y panel and emits continuous,
+uncalibrated mLRR-Y screening metrics. It never emits negative or event calls.
 
-## Callable panel
+## Preservation of borderline biology
 
-An eligible non-PAR/non-XTR Y parent interval is selected independently within
-each capture family when at least 80% of its territory is at least 20x in at
-least 95% of sex-gate-passing male samples. The sample metric is the median of
-`log2(interval mean depth / autosomal mean depth)` over the selected intervals.
+Sex inference is context, not an exclusion filter. Reported males, inferred
+males and samples held for a sex-chromosome anomaly remain in the output. Only
+sex-gate-passing male-like samples contribute to the callable panel and control
+reference.
 
-Samples with positive depth in less than 95% of the panel are held. Complete
-absence of Y signal is a manual-review state, not an automatic mLOY event.
+The pre-calibration tiers are:
 
-## Normalization and young null
+- `EXTREME_CANDIDATE_UNCALIBRATED`: below the young-control three-sigma
+  threshold with interpretive loss fraction at least 10%;
+- `BORDERLINE_CANDIDATE_UNCALIBRATED`: interpretive loss fraction at least 5%;
+- `WEAK_SIGNAL_RETAINED`: below the young-control two-sigma threshold;
+- `WITHIN_REFERENCE_UNCALIBRATED`: not flagged by the exploratory thresholds;
+- explicit technical, absent-signal and sex-chromosome-anomaly review states.
 
-The raw metric is centered on TP53-negative males:
+`WITHIN_REFERENCE_UNCALIBRATED` is not a negative result. Every row retains the
+continuous metrics and `event_call_LOY=NOT_CALIBRATED`.
 
-- use the batch-specific control median when a batch has at least five eligible
-  male controls;
-- otherwise use the assay-wide control median.
+## Target breadth and zero-aware metrics
 
-The screening null is the youngest tertile of eligible TP53-negative males
-within assay. The exploratory screen requires mLRR-Y below the young-null median
-minus three robust standard deviations and an interpretive dosage loss of at
-least 10%.
+The gate retains the legacy median interval metric for continuity and adds:
 
-The screen is not an event call. `event_call_LOY` remains `NOT_CALIBRATED` until
-BAM-level downsampling of Y non-PAR reads establishes recovery, bias and
-sensitivity by assay and depth.
+- a territory-weighted zero-aware Y/autosome metric;
+- the number of zero-depth targets;
+- interval-specific residuals against batch controls when available;
+- the fraction of targets below the control median, -0.05 log2 and -0.10 log2;
+- residual median and 10th/90th percentiles.
 
-## FULL1329 gate result
+This distinguishes chromosome-wide depression from a few failing targets.
+Samples with incomplete panels are retained as technically non-evaluable, and
+complete absence of Y remains a mandatory manual-review state.
 
-- 273 male samples entered the module: 256 TP53-negative, 14 R337H and three
-  non-R337H LFS;
-- IDT panel: 160 intervals, 27,772 bases;
-- Twist panel: 169 intervals, 28,019 bases;
-- 271 samples produced eligible metrics;
-- one sample had an incomplete panel and one had no Y signal;
-- nine Twist samples screened positive before calibration: eight controls and
-  one R337H, with ages spanning 9.2 to 79.7 years;
-- no binary mLOY event was emitted.
+## FULL1329 sensitive rerun
 
-The very young screening-positive control demonstrates that the statistical
-screen alone includes technical variation and cannot be interpreted as mLOY
-prevalence.
+The verified existing interval collection was re-evaluated without reading
+BAMs:
+
+- 273 reference male samples plus one sex-chromosome anomaly review;
+- 272 eligible metrics, one incomplete panel and one absent-Y manual review;
+- nine extreme candidates;
+- 26 borderline candidates between the current exploratory fraction tiers;
+- eight additional weak signals retained;
+- no negative or mLOY event calls.
+
+The candidate distribution includes very young controls. Therefore the tiers
+remain technical screening categories and cannot be interpreted as prevalence.
+BAM-level Y non-PAR downsampling by assay, depth and low fraction is required.
