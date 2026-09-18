@@ -10,9 +10,9 @@ staged SNV/indel pipeline in `genomic-aging-snv`.
 This is a **development snapshot, not a production release**. No CNV/LOH
 cohort run has been launched for the 1,329 study samples from this code.
 
-With the pinned Python dependencies installed, the current portable regression
-suite contains 225 passing tests, with 11 optional skips in the currently
-available environment. Historical
+With the pinned Python dependencies installed, the current regression suite
+contains 241 tests. In the isolated `pysam` environment, 233 pass and eight
+optional native/runtime tests are skipped. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
 retained under `validation/`. Those tests demonstrate implementation and file
@@ -70,6 +70,12 @@ somatic origin or a TP53 second hit.
   depth-only BAM Y thinning; neither mode emits event or negative calls.
 - `mlox_calibration.py`: interval-summary Monte Carlo calibration and depth-only
   BAM X thinning; neither mode emits event or negative calls.
+- `sex_chromosome_specificity.py`: deterministic held-out refitting of callable
+  panels, normalization and young-null thresholds. TP53-negative retained-signal
+  rates are not mislabeled as false-positive rates.
+- `sex_chromosome_read_calibration.py`: target-only read-level X/Y thinning in
+  memory. It writes no pseudo-BAMs and requires exact fraction-zero agreement
+  with the frozen QC interval sums.
 - `tests/`: synthetic unit, contract and optional native smoke tests.
 - `validation/`: historical synthetic native-test receipts; no patient data.
 
@@ -88,6 +94,10 @@ Native smoke tests additionally require separately installed and licensed
 CNVkit, samtools, `snp-pileup`, R, DNAcopy, FACETS-CH and `pctGCdata`. Their
 paths are explicit command-line inputs; the test suite does not install them.
 See `docs/REPRODUCIBILITY.md` and `UPSTREAM_AUDIT.md`.
+
+The sex-chromosome validation order, boundary fraction grids and orthogonal
+array handoff are documented in
+[`docs/SEX_CHROMOSOME_VALIDATION.md`](docs/SEX_CHROMOSOME_VALIDATION.md).
 
 ## Production boundary
 

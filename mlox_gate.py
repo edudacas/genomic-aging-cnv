@@ -110,7 +110,10 @@ def build_gate(
     collection: dict[str, Any],
     sex_rows: list[dict[str, Any]],
     metadata: dict[str, dict[str, Any]],
+    *,
+    training_excluded_sample_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    training_excluded_sample_ids = set(training_excluded_sample_ids or ())
     if collection.get("status") != "MLOX_INTERVAL_COLLECTION_COMPLETE":
         raise ValueError("mLOX interval collection is incomplete")
     collected = {row["sample_id"]: row for row in collection["samples"]}
@@ -143,6 +146,7 @@ def build_gate(
             "age_at_collection": age_value,
             "age_status": "AVAILABLE" if age_value is not None else "MISSING_RETAINED",
             "collection": collected[sample_id],
+            "held_out_specificity": sample_id in training_excluded_sample_ids,
         }
         reported_female = sex_row.get("sex_reported") == "Female"
         inferred_female = sex_row.get("sex_inferred") == "Female"
@@ -185,7 +189,10 @@ def build_gate(
     }
     output: list[dict[str, Any]] = []
     for assay, assay_rows in sorted(by_assay.items()):
-        reference_females = [r for r in assay_rows if r["mlox_reference_eligible"]]
+        reference_females = [
+            r for r in assay_rows
+            if r["mlox_reference_eligible"] and not r["held_out_specificity"]
+        ]
         reference_males = males_by_assay.get(assay, [])
         if not reference_females or not reference_males:
             raise ValueError(f"{assay}: missing reference females or males")
@@ -222,7 +229,11 @@ def build_gate(
         eligible_females = [r for r in assay_rows if r["metric_status"] == "ELIGIBLE"]
         female_controls = [
             r for r in eligible_females
-            if r["study_group"] == "TP53_negative" and r["mlox_reference_eligible"]
+            if (
+                r["study_group"] == "TP53_negative"
+                and r["mlox_reference_eligible"]
+                and not r["held_out_specificity"]
+            )
         ]
         male_controls = [
             r for r in reference_males
@@ -444,6 +455,7 @@ def build_gate(
         },
         "event_calls_emitted": False,
         "negative_calls_emitted": False,
+        "training_excluded_sample_n": len(training_excluded_sample_ids),
         "borderline_signals_retained": True,
         "screening_is_not_an_event_call": True,
         "calibration_required": "BAM-level X-read substitution by assay, depth and fraction",

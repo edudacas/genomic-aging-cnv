@@ -106,6 +106,16 @@ class MloxGateTests(unittest.TestCase):
         self.assertIsNotNone(case["mLRR_X"])
         self.assertFalse(summary["negative_calls_emitted"])
 
+    def test_held_out_control_is_scored_but_excluded_from_training(self):
+        rows, summary, panel = build_gate(
+            *self.fixture(), training_excluded_sample_ids={"S0"}
+        )
+        held_out = next(row for row in rows if row["sample_id"] == "S0")
+        self.assertTrue(held_out["held_out_specificity"])
+        self.assertEqual(held_out["female_normalization_control_n"], 6)
+        self.assertEqual(panel["assays"]["A"]["reference_female_n"], 7)
+        self.assertEqual(summary["training_excluded_sample_n"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

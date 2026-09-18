@@ -72,7 +72,10 @@ def build_gate(
     collection: dict[str, Any],
     sex_rows: list[dict[str, Any]],
     metadata: dict[str, dict[str, Any]],
+    *,
+    training_excluded_sample_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    training_excluded_sample_ids = set(training_excluded_sample_ids or ())
     if collection.get("status") != "MLOY_INTERVAL_COLLECTION_COMPLETE":
         raise ValueError("mLOY interval collection is incomplete")
     collected = {row["sample_id"]: row for row in collection["samples"]}
@@ -112,6 +115,7 @@ def build_gate(
                 "mloy_reference_eligible": bool(
                     row.get("sex_gate_status") == "PASS" and (reported_male or inferred_male)
                 ),
+                "held_out_specificity": sample_id in training_excluded_sample_ids,
                 "sex_chromosome_anomaly_review": bool(anomaly_review),
                 "collection": collected[sample_id],
             }
@@ -147,7 +151,10 @@ def build_gate(
 
     output_rows: list[dict[str, Any]] = []
     for assay, assay_rows in sorted(by_assay.items()):
-        reference_rows = [row for row in assay_rows if row["mloy_reference_eligible"]]
+        reference_rows = [
+            row for row in assay_rows
+            if row["mloy_reference_eligible"] and not row["held_out_specificity"]
+        ]
         if not reference_rows:
             raise ValueError(f"{assay}: no reference-eligible males")
         interval_sets = [set(row["collection"]["eligible_y_intervals"]) for row in reference_rows]
@@ -218,7 +225,11 @@ def build_gate(
         eligible = [row for row in assay_rows if row["metric_status"] == "ELIGIBLE"]
         controls = [
             row for row in eligible
-            if row["study_group"] == "TP53_negative" and row["mloy_reference_eligible"]
+            if (
+                row["study_group"] == "TP53_negative"
+                and row["mloy_reference_eligible"]
+                and not row["held_out_specificity"]
+            )
         ]
         if len(controls) < 6:
             raise ValueError(f"{assay}: insufficient eligible TP53-negative male controls")
@@ -421,6 +432,7 @@ def build_gate(
         "event_calls_emitted": False,
         "screening_is_not_an_event_call": True,
         "negative_calls_emitted": False,
+        "training_excluded_sample_n": len(training_excluded_sample_ids),
         "borderline_signals_retained": True,
         "calibration_required": "BAM-level Y non-PAR downsampling by assay and depth",
         "collection_mask_sha256": collection["mask_sha256"],

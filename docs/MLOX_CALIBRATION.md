@@ -85,3 +85,21 @@ No mode emits negative or mLOX event calls. Coverage calibration estimates
 analytical detection behavior only. Haplotype-aware simulation or true and
 orthogonally confirmed mLOX samples remain necessary to validate allelic
 imbalance, biological specificity and clinical sensitivity.
+
+## Leakage-controlled reference behavior
+
+`sex_chromosome_specificity.py --axis mlox` assigns TP53-negative reference
+females to deterministic folds stratified by assay, batch and autosomal-depth
+tertile. For each fold, callable intervals, normalization baselines and the
+young-null thresholds are rebuilt without that fold; held-out samples are then
+scored exactly once. A TP53-negative donor can still carry real age-related
+mLOX, so the retained-signal rate is not labeled a false-positive rate.
+
+## Target-only read-level validation
+
+`sex_chromosome_read_calibration.py --axis mlox` scans only frozen callable X
+targets, applies deterministic template thinning in memory and retains the
+frozen autosomal denominator. It writes no pseudo-BAMs. Before any altered
+fraction is accepted, fraction zero must reproduce every frozen target
+`depth_sum` exactly. The boundary grid is Twist 2.5/5/7.5% and IDT 10/15/20%,
+plus fraction zero and three prespecified seeds.

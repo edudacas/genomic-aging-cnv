@@ -82,3 +82,21 @@ is required before it can unlock a research event threshold. True or
 orthogonally confirmed mLOY samples remain necessary for biological specificity
 and clinical sensitivity. The substantially smaller callable Y territory means
 uncertainty must be reported by assay and depth stratum.
+
+## Leakage-controlled reference behavior
+
+`sex_chromosome_specificity.py --axis mloy` assigns TP53-negative reference
+males to deterministic folds stratified by assay, batch and autosomal-depth
+tertile. Callable intervals, normalization and young-null thresholds are
+rebuilt without each held-out fold before scoring it. Because a TP53-negative
+male may have true age-related mLOY, the resulting retained-signal rate is not
+an orthogonal false-positive rate.
+
+## Target-only read-level validation
+
+`sex_chromosome_read_calibration.py --axis mloy` scans only frozen callable Y
+targets, applies deterministic template thinning in memory and keeps the
+frozen autosomal denominator. It writes no pseudo-BAMs. Fraction zero must
+exactly reconstruct every frozen target `depth_sum`, otherwise the filter
+contract fails closed. The boundary grid is IDT 5/7.5/10% and Twist
+7.5/10/15%, plus fraction zero and three prespecified seeds.
