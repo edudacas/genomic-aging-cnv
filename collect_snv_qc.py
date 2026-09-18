@@ -42,7 +42,7 @@ def collect(stages, destination, expected):
             if relative.is_absolute() or '..' in relative.parts:
                 raise ValueError('unsafe QC artifact')
             path=directory/relative
-            if path.is_symlink() or not path.resolve().is_relative_to(directory.resolve()):
+            if path.is_symlink() or directory.resolve() not in path.resolve().parents:
                 raise ValueError('unsafe QC artifact path')
             if path.name not in ('qc.json','coverage.summary.json','coverage.compartments.tsv'):
                 continue
