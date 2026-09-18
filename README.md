@@ -66,6 +66,8 @@ somatic origin or a TP53 second hit.
   and sensitive, non-negative mLOY screening.
 - `collect_mlox_intervals.py`, `mlox_gate.py`: verified X non-PAR/non-XTR
   interval collection and sensitive, non-negative mLOX screening.
+- `mlox_calibration.py`: interval-summary Monte Carlo calibration and depth-only
+  BAM X thinning; neither mode emits event or negative calls.
 - `tests/`: synthetic unit, contract and optional native smoke tests.
 - `validation/`: historical synthetic native-test receipts; no patient data.
 

@@ -42,5 +42,9 @@ four extreme signals were distributed across approximately 63–80% of callable
 X targets rather than being confined to a few intervals. Borderline signals
 include very young controls, so the tiers cannot be interpreted as prevalence.
 
-BAM-level X read substitution at low fractions remains required to calibrate
-sensitivity and distinguish diffuse mLOX from residual target or batch effects.
+`mlox_calibration.py` now implements prespecified interval-summary Monte Carlo
+thinning and depth-only BAM X thinning. Interval-summary results remain
+provisional until representative BAMs are thinned and rerun through compact
+coverage collection. Neither mode models haplotype-specific allelic imbalance;
+true or orthogonally confirmed mLOX samples remain necessary for biological and
+clinical validation. See `docs/MLOX_CALIBRATION.md`.

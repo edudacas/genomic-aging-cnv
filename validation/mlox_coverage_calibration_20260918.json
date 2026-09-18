@@ -1,0 +1,81 @@
+{
+  "status": "MLOX_COVERAGE_THINNING_CALIBRATION_COMPLETE_BAM_VALIDATION_REQUIRED",
+  "calibration_version": "mlox-coverage-thinning-v1",
+  "private_identifiers_in_receipt": false,
+  "donor_n": 18,
+  "replicate_n": 900,
+  "donors_per_assay_per_depth_stratum": 3,
+  "depth_strata": [
+    "LOW",
+    "MID",
+    "HIGH"
+  ],
+  "fractions": [
+    0.0,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.4
+  ],
+  "seeds": [
+    17,
+    29,
+    43,
+    71,
+    101
+  ],
+  "lod_rule": "lowest fraction with pooled borderline-or-extreme sensitivity >=0.95 and every depth stratum >=0.90",
+  "assays": {
+    "MGI_IDT_EXOME": {
+      "fraction_zero_retained_signal_donors": 0,
+      "fraction_zero_donors": 9,
+      "provisional_borderline_lod": 0.15,
+      "borderline_or_extreme_by_fraction": {
+        "0.0": [0, 45],
+        "0.01": [0, 45],
+        "0.025": [5, 45],
+        "0.05": [34, 45],
+        "0.075": [40, 45],
+        "0.1": [40, 45],
+        "0.15": [45, 45],
+        "0.2": [45, 45],
+        "0.3": [45, 45],
+        "0.4": [45, 45]
+      }
+    },
+    "TWIST_WES_OS_T7": {
+      "fraction_zero_retained_signal_donors": 0,
+      "fraction_zero_donors": 9,
+      "provisional_borderline_lod": 0.05,
+      "borderline_or_extreme_by_fraction": {
+        "0.0": [0, 45],
+        "0.01": [0, 45],
+        "0.025": [0, 45],
+        "0.05": [44, 45],
+        "0.075": [45, 45],
+        "0.1": [45, 45],
+        "0.15": [45, 45],
+        "0.2": [45, 45],
+        "0.3": [45, 45],
+        "0.4": [45, 45]
+      }
+    }
+  },
+  "event_calls_emitted": false,
+  "negative_calls_emitted": false,
+  "clinical_validation_complete": false,
+  "bam_validation_required": true,
+  "haplotype_specific_imbalance_simulated": false,
+  "native_bam_thinning_smoke_test": "PASS_WITH_PYSAM_0.23.3",
+  "collection_sha256": "98be0cfb9c2ef7a9988be71785b48308fa9f36477da995e6d522d0b1ba597c1a",
+  "metrics_sha256": "9a872e94f170354666d421b4fbc66ef2411d1bea5c2a8e743aca72620da0fdb7",
+  "panel_sha256": "f5c555dd3845b87df907b28f9558230e13cf8a69720b070a39e55b351d9a030e",
+  "implementation_sha256": "c19b087cb57579c7c44687f36e10d8fe04ece43845eb4cea536887d951072edb",
+  "private_summary_sha256": "aabc1071555b855af4948f14c3c607c28efadbf603b6ea59fa20873b664cd318",
+  "private_complete_receipt_sha256": "4c617c8cbb6ece99df93bceff43992bc12704e3778a0475e6a9a2643459c1694"
+}
