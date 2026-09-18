@@ -40,8 +40,12 @@ def main(root):
     python = root/'python/bin/python'
     if not python.exists():
         run([sys.executable, '-m','venv',root/'python'])
-    run([python,'-m','pip','install','CNVkit==0.9.12','pysam==0.23.3',
-         'pyarrow==25.0.1','numpy==1.26.4'])
+    lock=Path(__file__).with_name('python.observed.lock.txt')
+    if lock.exists():
+        run([python,'-m','pip','install','-r',lock])
+    else:
+        run([python,'-m','pip','install','CNVkit==0.9.12','pysam==0.23.3',
+             'pyarrow==25.0.1','numpy==1.26.4'])
     with (root/'python.freeze.txt').open('w') as f:
         subprocess.run([str(python),'-m','pip','freeze','--all'],stdout=f,check=True)
     library = root/'R-library'
@@ -62,6 +66,8 @@ def main(root):
     dna=archives/'DNAcopy_1.86.0.tar.gz'
     if not dna.exists():
         urllib.request.urlretrieve('https://bioconductor.org/packages/3.23/bioc/src/contrib/DNAcopy_1.86.0.tar.gz',dna)
+    if sha(dna)!='bd591ad40155a49e875867d0c57ea38fb30d087fb4b79a9c294b328d2a556924':
+        raise ValueError('DNAcopy source checksum mismatch')
     for package in [dna,gcsource,source]:
         run(['R','CMD','INSTALL','--library='+str(library),package],env=env)
     bindir=root/'bin'
