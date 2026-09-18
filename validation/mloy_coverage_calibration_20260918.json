@@ -1,0 +1,80 @@
+{
+  "status": "MLOY_COVERAGE_THINNING_CALIBRATION_COMPLETE_BAM_VALIDATION_REQUIRED",
+  "calibration_version": "mloy-coverage-thinning-v1",
+  "private_identifiers_in_receipt": false,
+  "donor_n": 18,
+  "replicate_n": 900,
+  "donors_per_assay_per_depth_stratum": 3,
+  "depth_strata": [
+    "LOW",
+    "MID",
+    "HIGH"
+  ],
+  "fractions": [
+    0.0,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.4
+  ],
+  "seeds": [
+    17,
+    29,
+    43,
+    71,
+    101
+  ],
+  "lod_rule": "lowest fraction with pooled borderline-or-extreme sensitivity >=0.95 and every depth stratum >=0.90",
+  "assays": {
+    "MGI_IDT_EXOME": {
+      "fraction_zero_retained_signal_donors": 0,
+      "fraction_zero_donors": 9,
+      "provisional_borderline_lod": 0.075,
+      "borderline_or_extreme_by_fraction": {
+        "0.0": [0, 45],
+        "0.01": [0, 45],
+        "0.025": [0, 45],
+        "0.05": [22, 45],
+        "0.075": [45, 45],
+        "0.1": [45, 45],
+        "0.15": [45, 45],
+        "0.2": [45, 45],
+        "0.3": [45, 45],
+        "0.4": [45, 45]
+      }
+    },
+    "TWIST_WES_OS_T7": {
+      "fraction_zero_retained_signal_donors": 0,
+      "fraction_zero_donors": 9,
+      "provisional_borderline_lod": 0.1,
+      "borderline_or_extreme_by_fraction": {
+        "0.0": [0, 45],
+        "0.01": [0, 45],
+        "0.025": [0, 45],
+        "0.05": [17, 45],
+        "0.075": [32, 45],
+        "0.1": [45, 45],
+        "0.15": [45, 45],
+        "0.2": [45, 45],
+        "0.3": [45, 45],
+        "0.4": [45, 45]
+      }
+    }
+  },
+  "event_calls_emitted": false,
+  "negative_calls_emitted": false,
+  "clinical_validation_complete": false,
+  "bam_validation_required": true,
+  "native_bam_thinning_smoke_test": "PASS_WITH_PYSAM_0.23.3",
+  "collection_sha256": "74c019f2a95f24bceeeeaec824eb2a0614e7173a26787eb94212c7bf04b2d8de",
+  "metrics_sha256": "ec4201c03b5ca909a8d415c8ee0eebcbe8f125852fe238095279513ebc284890",
+  "panel_sha256": "d5fb5948234d546178a7e1b62aef920c0eee00d780221b1d2470f05a1b7ea612",
+  "implementation_sha256": "ab383e9d5c310bdb97c4399dc55b17e176126e6b92513b8acdb89da090647a4d",
+  "private_summary_sha256": "47da6194468a372f4fb5bdcf970ba6460ed28172e8d5ca1180d826a76d3a410e",
+  "private_complete_receipt_sha256": "11609222904cbb41a9784c065f171bb2bd31133137da8e33fccdc901a7892f9f"
+}

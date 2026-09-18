@@ -50,4 +50,8 @@ BAMs:
 
 The candidate distribution includes very young controls. Therefore the tiers
 remain technical screening categories and cannot be interpreted as prevalence.
-BAM-level Y non-PAR downsampling by assay, depth and low fraction is required.
+
+`mloy_calibration.py` now implements interval-summary Monte Carlo thinning and
+depth-only BAM Y thinning. Interval-summary limits remain provisional until
+representative BAMs are rerun through compact coverage collection. See
+`docs/MLOY_CALIBRATION.md`.
