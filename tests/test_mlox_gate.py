@@ -96,6 +96,16 @@ class MloxGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "sample mismatch"):
             build_gate(collection, sex, metadata)
 
+    def test_missing_age_is_retained_and_excluded_only_from_young_null(self):
+        collection, sex, metadata = self.fixture()
+        metadata["CASE"]["age_at_collection"] = None
+        rows, summary, _ = build_gate(collection, sex, metadata)
+        case = next(row for row in rows if row["sample_id"] == "CASE")
+        self.assertIsNone(case["age_at_collection"])
+        self.assertEqual(case["age_status"], "MISSING_RETAINED")
+        self.assertIsNotNone(case["mLRR_X"])
+        self.assertFalse(summary["negative_calls_emitted"])
+
 
 if __name__ == "__main__":
     unittest.main()

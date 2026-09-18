@@ -126,8 +126,11 @@ def build_gate(
             raise ValueError(f"{sample_id}: workbook linkage missing")
         info = metadata[analysis_id]
         age = info.get("age_at_collection")
-        if not isinstance(age, (int, float)) or not math.isfinite(float(age)) or age < 0:
-            raise ValueError(f"{sample_id}: invalid age_at_collection")
+        age_value = (
+            float(age)
+            if isinstance(age, (int, float)) and math.isfinite(float(age)) and age >= 0
+            else None
+        )
         common = {
             "sample_id": sample_id,
             "analysis_id": analysis_id,
@@ -137,7 +140,8 @@ def build_gate(
             "sex_reported": sex_row["sex_reported"],
             "sex_inferred": sex_row.get("sex_inferred"),
             "study_group": info.get("study_group"),
-            "age_at_collection": float(age),
+            "age_at_collection": age_value,
+            "age_status": "AVAILABLE" if age_value is not None else "MISSING_RETAINED",
             "collection": collected[sample_id],
         }
         reported_female = sex_row.get("sex_reported") == "Female"
@@ -233,6 +237,46 @@ def build_gate(
         for row in male_controls:
             male_by_batch[row["batch_id"]].append(row)
 
+        female_control_sets: dict[tuple[str, str], list[dict[str, Any]]] = {
+            ("ASSAY", assay): female_controls
+        }
+        male_control_sets: dict[tuple[str, str], list[dict[str, Any]]] = {
+            ("ASSAY", assay): male_controls
+        }
+        for batch_id, batch_rows in female_by_batch.items():
+            if len(batch_rows) >= MIN_RUN_CONTROLS:
+                female_control_sets[("BATCH", batch_id)] = batch_rows
+        for batch_id, batch_rows in male_by_batch.items():
+            if len(batch_rows) >= MIN_RUN_CONTROLS:
+                male_control_sets[("BATCH", batch_id)] = batch_rows
+
+        female_log_baselines = {
+            key: _median(
+                [row["raw_log2_x_auto_median"] for row in control_rows],
+                f"{assay}/{key} female baseline",
+            )
+            for key, control_rows in female_control_sets.items()
+        }
+        male_log_baselines = {
+            key: _median(
+                [row["raw_log2_x_auto_median"] for row in control_rows],
+                f"{assay}/{key} male baseline",
+            )
+            for key, control_rows in male_control_sets.items()
+        }
+        female_interval_baselines: dict[tuple[str, str], dict[str, float]] = {}
+        for key, control_rows in female_control_sets.items():
+            female_interval_baselines[key] = {
+                interval_id: _median(
+                    [
+                        float(control["collection"]["eligible_x_intervals"][interval_id]["depth_over_autosome"])
+                        for control in control_rows
+                    ],
+                    f"{assay}/{key}/{interval_id} female controls",
+                )
+                for interval_id in selected
+            }
+
         for row in assay_rows:
             row.update({
                 "normalization_scope": None,
@@ -247,30 +291,27 @@ def build_gate(
             })
             if row["metric_status"] != "ELIGIBLE":
                 continue
-            female_reference = female_by_batch[row["batch_id"]]
-            male_reference = male_by_batch[row["batch_id"]]
-            if len(female_reference) < MIN_RUN_CONTROLS:
-                female_reference = female_controls
-            if len(male_reference) < MIN_RUN_CONTROLS:
-                male_reference = male_controls
-            female_baseline = _median(
-                [r["raw_log2_x_auto_median"] for r in female_reference],
-                f"{assay} female baseline",
+            female_key = (
+                ("BATCH", row["batch_id"])
+                if ("BATCH", row["batch_id"]) in female_control_sets
+                else ("ASSAY", assay)
             )
-            male_baseline = _median(
-                [r["raw_log2_x_auto_median"] for r in male_reference],
-                f"{assay} male baseline",
+            male_key = (
+                ("BATCH", row["batch_id"])
+                if ("BATCH", row["batch_id"]) in male_control_sets
+                else ("ASSAY", assay)
             )
+            female_reference = female_control_sets[female_key]
+            male_reference = male_control_sets[male_key]
+            female_baseline = female_log_baselines[female_key]
+            male_baseline = male_log_baselines[male_key]
             female_linear = 2.0 ** female_baseline
             male_linear = 2.0 ** male_baseline
             observed_linear = 2.0 ** row["raw_log2_x_auto_median"]
             if not female_linear > male_linear > 0:
                 raise ValueError(f"{assay}: invalid female/male X dosage baselines")
             row["normalization_scope"] = (
-                "BATCH_SEX_SPECIFIC_TP53_NEGATIVE"
-                if female_reference is female_by_batch[row["batch_id"]]
-                and male_reference is male_by_batch[row["batch_id"]]
-                else "ASSAY_SEX_SPECIFIC_TP53_NEGATIVE"
+                f"FEMALE_{female_key[0]}_MALE_{male_key[0]}_TP53_NEGATIVE"
             )
             row["female_normalization_control_n"] = len(female_reference)
             row["male_dosage_control_n"] = len(male_reference)
@@ -284,12 +325,10 @@ def build_gate(
             residuals: list[float] = []
             below_zero = below_005 = below_010 = 0
             intervals = row["collection"]["eligible_x_intervals"]
+            interval_references = female_interval_baselines[female_key]
             for interval_id in selected:
                 observed = float(intervals[interval_id]["depth_over_autosome"])
-                reference = _median([
-                    float(value["collection"]["eligible_x_intervals"][interval_id]["depth_over_autosome"])
-                    for value in female_reference
-                ], f"{assay}/{interval_id} female controls")
+                reference = interval_references[interval_id]
                 if reference <= 0:
                     raise ValueError(f"{assay}/{interval_id}: non-positive female control median")
                 if observed > 0:
@@ -307,8 +346,16 @@ def build_gate(
             row["fraction_targets_below_minus_0_05"] = below_005 / len(selected)
             row["fraction_targets_below_minus_0_10"] = below_010 / len(selected)
 
-        young_n = math.ceil(len(female_controls) / 3)
-        young = sorted(female_controls, key=lambda r: (r["age_at_collection"], r["sample_id"]))[:young_n]
+        age_eligible_controls = [
+            row for row in female_controls if row["age_at_collection"] is not None
+        ]
+        if len(age_eligible_controls) < 6:
+            raise ValueError(f"{assay}: insufficient age-eligible female controls")
+        young_n = math.ceil(len(age_eligible_controls) / 3)
+        young = sorted(
+            age_eligible_controls,
+            key=lambda r: (r["age_at_collection"], r["sample_id"]),
+        )[:young_n]
         null_values = [r["mLRR_X"] for r in young]
         null_median = _median(null_values, f"{assay} young female null")
         null_mad = _median([abs(v - null_median) for v in null_values], f"{assay} young female MAD")
@@ -358,6 +405,7 @@ def build_gate(
                 for interval_id in selected
             ),
             "young_null_n": len(young),
+            "female_controls_missing_age_n": len(female_controls) - len(age_eligible_controls),
             "young_null_max_age": max(r["age_at_collection"] for r in young),
             "young_null_median": null_median,
             "young_null_robust_sigma": robust_sigma,
@@ -387,6 +435,7 @@ def build_gate(
         "mlox_analysis_samples": len(clean_rows),
         "reference_female_samples": sum(r["mlox_reference_eligible"] for r in clean_rows),
         "sex_chromosome_anomaly_review_samples": sum(r["sex_chromosome_anomaly_review"] for r in clean_rows),
+        "age_status_counts": dict(sorted(Counter(r["age_status"] for r in clean_rows).items())),
         "metric_status_counts": dict(sorted(Counter(r["metric_status"] for r in clean_rows).items())),
         "screen_tier_counts": dict(sorted(tiers.items())),
         "retained_candidate_by_assay_and_group": {

@@ -21,7 +21,26 @@ TP53-negative controls and otherwise assay-specific. The same sensitive,
 non-negative tiers used for mLOY are emitted for mLOX. `event_call_LOX` always
 remains `NOT_CALIBRATED`.
 
-The collector must be run on the server because the downloaded Y collection
-does not contain interval-level X values. A real-cohort mLOX result therefore
-remains pending. BAM-level X read substitution at low fractions is required to
-calibrate sensitivity and distinguish diffuse mLOX from target dropout.
+## FULL1329 sensitive run
+
+The receipt-verified X collection completed for all 1,329 samples with 6,656
+eligible parent intervals covering 1,261,299 bases. Assay-specific callable
+panels retained 6,304 IDT intervals and 6,312 Twist intervals.
+
+The screening gate retained 1,056 female-like or sex-chromosome-anomaly rows:
+
+- four extreme candidates;
+- 18 borderline candidates;
+- 41 additional weak signals;
+- one sex-chromosome anomaly review;
+- 992 within the current uncalibrated reference distribution;
+- no negative or mLOX event calls.
+
+All 1,056 rows had evaluable interval metrics. One missing collection age was
+retained in the metrics and excluded only from the young-null definition. The
+four extreme signals were distributed across approximately 63–80% of callable
+X targets rather than being confined to a few intervals. Borderline signals
+include very young controls, so the tiers cannot be interpreted as prevalence.
+
+BAM-level X read substitution at low fractions remains required to calibrate
+sensitivity and distinguish diffuse mLOX from residual target or batch effects.

@@ -11,7 +11,7 @@ This is a **development snapshot, not a production release**. No CNV/LOH
 cohort run has been launched for the 1,329 study samples from this code.
 
 With the pinned Python dependencies installed, the current portable regression
-suite contains 224 passing tests, with 11 optional skips in the currently
+suite contains 225 passing tests, with 11 optional skips in the currently
 available environment. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
