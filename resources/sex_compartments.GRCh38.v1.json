@@ -1,0 +1,33 @@
+{
+  "assembly": "GRCh38",
+  "coordinate_system": "0-based-half-open",
+  "schema_version": 1,
+  "sex_inference_status": "FROZEN_X_NONPAR_GATE",
+  "sex_inference_territory": "X_NONPAR_EXCLUDING_PAR_ONLY",
+  "sex_inference_uses_y": false,
+  "par": {
+    "chrX": [[10000, 2781479], [155701382, 156030895]],
+    "chrY": [[10000, 2781479], [56887902, 57217415]],
+    "source": "Genome Reference Consortium and Ensembl GRCh38 PAR boundaries; converted from 1-based inclusive to 0-based half-open"
+  },
+  "xtr": {
+    "chrX": [[89140830, 93428068]],
+    "chrY": [[3050044, 6235111], [6532906, 6748713]],
+    "source": "SexChrLab/VariantCalling resources/genomic_features GRCh38 BED files, lifted from Webster et al. 2019",
+    "status": "FROZEN_FOR_FUTURE_RECOMPUTATION_NOT_USED_IN_CURRENT_SEX_GATE",
+    "current_import_compatible": false,
+    "required_action": "Recompute Y compartments from retained interval summaries before mLOY analysis"
+  },
+  "source_urls": [
+    "https://www.ncbi.nlm.nih.gov/grc/human",
+    "https://mart.ensembl.org/info/genome/genebuild/human_PARS.html",
+    "https://github.com/SexChrLab/VariantCalling/blob/master/resources/genomic_features/README.md",
+    "https://github.com/SexChrLab/VariantCalling/blob/master/resources/genomic_features/chrX_genomic_features_GRCh38.bed",
+    "https://github.com/SexChrLab/VariantCalling/blob/master/resources/genomic_features/chrY_genomic_features_GRCh38.bed"
+  ],
+  "notes": [
+    "The imported X_NONPAR compartment depends only on the official PAR boundaries and is compatible with this sex gate.",
+    "The imported Y_NONPAR_NONXTR ratio used an older provisional XTR approximation and is audit-only here.",
+    "No sex label is overwritten; inferred sex is stored separately."
+  ]
+}
