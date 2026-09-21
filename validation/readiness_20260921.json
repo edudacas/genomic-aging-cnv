@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "status": "CONTAINER_FROZEN_RESOURCES_NOT_READY_COHORT_NOT_STARTED",
-  "as_of_utc": "2026-09-21T15:19:00Z",
+  "as_of_utc": "2026-09-21T15:41:27Z",
   "privacy": {
     "patient_identifiers_in_receipt": false,
     "private_paths_in_receipt": false,
@@ -10,7 +10,7 @@
   "source": {
     "branch": "codex/runtime-resource-readiness",
     "pull_request": "https://github.com/edudacas/genomic-aging-cnv/pull/1",
-    "code_validated_sha": "ef3d4fb9b09460ad4c845e3b5ebc476fcad3940b"
+    "code_validated_sha": "809529a8ea61fd7be742fc29e30c84d57764a6da"
   },
   "tests": {
     "github_actions_run_id": 35616945028,
@@ -30,8 +30,8 @@
     "container_build_workflow_defined": true,
     "container_image_frozen": true,
     "bit_reproducible_source_rebuild": false,
-    "container_build_workflow_run_id": 35616937773,
-    "container_image_id": "sha256:d470dd781b56a52484c452f5b4d1ea881dd1aa18225326f6e29bd04d72110547",
+    "container_build_workflow_run_id": 35618535936,
+    "container_image_id": "sha256:60f57577c52e658ac79dc1228660c8633ecff259fad03dec891abd5bf098371e",
     "container_receipt": "validation/container_freeze_20260921.json",
     "container_artifact_durable_release": false
   },

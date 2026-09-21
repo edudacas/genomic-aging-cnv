@@ -23,7 +23,7 @@ specificity, a limit of detection or fitness of a study panel of normals.
 
 The original temporary runtime has been replaced locally by a persistent,
 isolated installation with fresh LOSS/GAIN/CNLOH integration tests. A candidate
-container pinned to an Ubuntu 24.04 digest was built at commit `ef3d4fb` and
+container pinned to an Ubuntu 24.04 digest was built at commit `809529a` and
 passed the native synthetic/event checks. Its image archive and receipts are a
 90-day private Actions artifact; dependency resolution is not yet a
 bit-reproducible source rebuild or durable release. See
