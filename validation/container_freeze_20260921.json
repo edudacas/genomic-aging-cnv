@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "status": "CONTAINER_IMAGE_BUILT_NATIVE_TESTS_PASS",
+  "completed_utc": "2026-09-21T15:19:00Z",
+  "patient_data_used": false,
+  "source_commit": "ef3d4fb9b09460ad4c845e3b5ebc476fcad3940b",
+  "workflow_run": {
+    "id": 35616937773,
+    "url": "https://github.com/edudacas/genomic-aging-cnv/actions/runs/35616937773",
+    "conclusion": "success"
+  },
+  "base_image": "ubuntu@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254",
+  "image_id": "sha256:d470dd781b56a52484c452f5b4d1ea881dd1aa18225326f6e29bd04d72110547",
+  "native_validation": {
+    "loss": true,
+    "gain": true,
+    "cnloh": true,
+    "ideal_event_signals": true
+  },
+  "artifact": {
+    "id": 10647481422,
+    "name": "cnv-container-ef3d4fb9b09460ad4c845e3b5ebc476fcad3940b",
+    "size_bytes": 1289038882,
+    "digest": "sha256:5049ed80bebce671464dbc251fac326bcb42eeaae1ebf551cf48ea36a9cb7a8b",
+    "expires_at": "2026-12-20T15:08:45Z",
+    "contains_docker_image_archive": true,
+    "contains_archive_sha256": true,
+    "contains_runtime_and_validation_receipts": true
+  },
+  "bit_reproducible_source_rebuild": false,
+  "durable_registry_release": false,
+  "cohort_executed": false
+}

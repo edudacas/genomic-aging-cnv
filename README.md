@@ -22,13 +22,16 @@ boundary behavior. They do not establish clinical validity, study sensitivity,
 specificity, a limit of detection or fitness of a study panel of normals.
 
 The original temporary runtime has been replaced locally by a persistent,
-isolated installation with fresh LOSS/GAIN/CNLOH integration tests. The runtime
-is still host-bound and is not distributed here. See
-[`docs/READINESS_20260918.md`](docs/READINESS_20260918.md) for the bootstrap,
-container build candidate, private inventory and QC collector.
-Production readiness still requires a validated frozen container,
-assay-matched resources and PoNs, real-BAM canaries, event-aware calibration and
-frozen classification thresholds. See `DEVELOPMENT_STATE.md`.
+isolated installation with fresh LOSS/GAIN/CNLOH integration tests. A candidate
+container pinned to an Ubuntu 24.04 digest was built at commit `ef3d4fb` and
+passed the native synthetic/event checks. Its image archive and receipts are a
+90-day private Actions artifact; dependency resolution is not yet a
+bit-reproducible source rebuild or durable release. See
+[`validation/container_freeze_20260921.json`](validation/container_freeze_20260921.json)
+and [`docs/READINESS_20260918.md`](docs/READINESS_20260918.md).
+Production readiness still requires assay-matched resources and PoNs, real-BAM
+canaries, event-aware calibration and frozen classification thresholds. See
+`DEVELOPMENT_STATE.md`.
 
 ## Intended workflow
 

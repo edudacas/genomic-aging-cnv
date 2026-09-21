@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "status": "PREPARATION_ADVANCED_COHORT_CALLING_NOT_STARTED",
-  "as_of_utc": "2026-09-21T00:00:00Z",
+  "status": "CONTAINER_FROZEN_RESOURCES_NOT_READY_COHORT_NOT_STARTED",
+  "as_of_utc": "2026-09-21T15:19:00Z",
   "privacy": {
     "patient_identifiers_in_receipt": false,
     "private_paths_in_receipt": false,
@@ -9,11 +9,11 @@
   },
   "source": {
     "branch": "codex/runtime-resource-readiness",
-    "reviewed_head_sha": "a9d5bae75a86a524d1035d70c48b233b65a9c039",
-    "pull_request": "https://github.com/edudacas/genomic-aging-cnv/pull/1"
+    "pull_request": "https://github.com/edudacas/genomic-aging-cnv/pull/1",
+    "code_validated_sha": "ef3d4fb9b09460ad4c845e3b5ebc476fcad3940b"
   },
   "tests": {
-    "github_actions_run_id": 35400315371,
+    "github_actions_run_id": 35616945028,
     "github_actions_status": "PASS",
     "python_version": "3.12.14",
     "tests_run": 241,
@@ -28,8 +28,12 @@
     "native_cnloh_passed": true,
     "runtime_is_host_bound": true,
     "container_build_workflow_defined": true,
-    "container_image_frozen": false,
-    "bit_reproducible_source_rebuild": false
+    "container_image_frozen": true,
+    "bit_reproducible_source_rebuild": false,
+    "container_build_workflow_run_id": 35616937773,
+    "container_image_id": "sha256:d470dd781b56a52484c452f5b4d1ea881dd1aa18225326f6e29bd04d72110547",
+    "container_receipt": "validation/container_freeze_20260921.json",
+    "container_artifact_durable_release": false
   },
   "study_inventory": {
     "rows": 1329,
@@ -58,5 +62,5 @@
     "event_classification_complete": false,
     "burden_analysis_started": false
   },
-  "interpretation": "Implementation, synthetic/native validation and X/Y screening readiness are advanced. The full BAM-level autosomal CNV/LOH pipeline remains blocked on frozen study resources, independent assay-matched PoNs and representative real-BAM canaries."
+  "interpretation": "Implementation, synthetic/native validation, a frozen candidate container and X/Y screening readiness are advanced. The full BAM-level autosomal CNV/LOH pipeline remains blocked on frozen study resources, independent assay-matched PoNs and representative real-BAM canaries."
 }
