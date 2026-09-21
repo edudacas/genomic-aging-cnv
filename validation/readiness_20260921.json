@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "status": "CONTAINER_FROZEN_RESOURCES_NOT_READY_COHORT_NOT_STARTED",
+  "as_of_utc": "2026-09-21T15:41:27Z",
+  "privacy": {
+    "patient_identifiers_in_receipt": false,
+    "private_paths_in_receipt": false,
+    "private_cohort_outputs_committed": false
+  },
+  "source": {
+    "branch": "codex/runtime-resource-readiness",
+    "pull_request": "https://github.com/edudacas/genomic-aging-cnv/pull/1",
+    "code_validated_sha": "809529a8ea61fd7be742fc29e30c84d57764a6da"
+  },
+  "tests": {
+    "github_actions_run_id": 35616945028,
+    "github_actions_status": "PASS",
+    "python_version": "3.12.14",
+    "tests_run": 241,
+    "passed": 234,
+    "skipped": 7,
+    "patient_data_used": false
+  },
+  "runtime": {
+    "persistent_local_runtime_installed": true,
+    "native_loss_passed": true,
+    "native_gain_passed": true,
+    "native_cnloh_passed": true,
+    "runtime_is_host_bound": true,
+    "container_build_workflow_defined": true,
+    "container_image_frozen": true,
+    "bit_reproducible_source_rebuild": false,
+    "container_build_workflow_run_id": 35618535936,
+    "container_image_id": "sha256:60f57577c52e658ac79dc1228660c8633ecff259fad03dec891abd5bf098371e",
+    "container_receipt": "validation/container_freeze_20260921.json",
+    "container_artifact_durable_release": false
+  },
+  "study_inventory": {
+    "rows": 1329,
+    "twist": 1208,
+    "idt": 121,
+    "assay_batch_combinations": 66,
+    "missing_batch_ids": 0,
+    "unknown_reported_sex": 234,
+    "server_qc_imported_private": true
+  },
+  "sex_chromosome_screening": {
+    "private_interval_summary_screening_complete": true,
+    "event_calls_emitted": false,
+    "negative_calls_emitted": false,
+    "mlox_calibration_receipt": "validation/mlox_coverage_calibration_20260918.json",
+    "mloy_calibration_receipt": "validation/mloy_coverage_calibration_20260918.json",
+    "bam_validation_required": true,
+    "orthogonal_validation_complete": false
+  },
+  "autosomal_cnv_loh": {
+    "study_targets_antitargets_frozen": false,
+    "independent_twist_pon_frozen": false,
+    "independent_idt_pon_frozen": false,
+    "representative_real_bam_canary_complete": false,
+    "cohort_executed": false,
+    "event_classification_complete": false,
+    "burden_analysis_started": false
+  },
+  "interpretation": "Implementation, synthetic/native validation, a frozen candidate container and X/Y screening readiness are advanced. The full BAM-level autosomal CNV/LOH pipeline remains blocked on frozen study resources, independent assay-matched PoNs and representative real-BAM canaries."
+}

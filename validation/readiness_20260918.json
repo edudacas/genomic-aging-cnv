@@ -1,0 +1,18 @@
+{
+  "status": "PREPARATION_PARTIAL_NOT_PRODUCTION",
+  "portable_tests_passed": 206,
+  "native_loss_passed": true,
+  "native_gain_passed": true,
+  "native_cnloh_passed": true,
+  "native_event_signal_checks_passed": true,
+  "persistent_local_runtime_installed": true,
+  "runtime_is_host_bound": true,
+  "container_built": false,
+  "container_blocker": "LOCAL_DOCKER_ENGINE_UNAVAILABLE",
+  "study_inventory_rows": 1329,
+  "study_resources_frozen": false,
+  "server_qc_imported": false,
+  "server_access_blocker": "SSH_AUTHENTICATION_UNAVAILABLE_IN_THIS_SESSION",
+  "cohort_executed": false,
+  "synthetic_validation_is_study_calibration": false
+}

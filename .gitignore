@@ -20,3 +20,7 @@ __pycache__/
 native-output/
 work/
 results/
+*.PRIVATE.*
+*.private.*
+*PRIVATE*/
+runtime-installed/

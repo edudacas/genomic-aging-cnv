@@ -7,21 +7,31 @@ staged SNV/indel pipeline in `genomic-aging-snv`.
 
 ## Status and validation boundary
 
-This is a **development snapshot, not a production release**. No CNV/LOH
-cohort run has been launched for the 1,329 study samples from this code.
+This is a **development snapshot, not a production release**. No full BAM-level
+CNV/LOH caller run has been launched for the 1,329 study samples from this code.
+Private cohort-wide X/Y interval-summary screening and provisional coverage
+calibration have completed; they are not CNV event calls.
 
-With the pinned Python dependencies installed, the current portable regression
-suite contains 195 passing tests. Historical
+With the pinned Python dependencies installed, the current GitHub Actions run
+executed 241 tests: 234 passed and seven optional native/runtime tests were
+skipped. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
 retained under `validation/`. Those tests demonstrate implementation and file
 boundary behavior. They do not establish clinical validity, study sensitivity,
 specificity, a limit of detection or fitness of a study panel of normals.
 
-The isolated native runtime used for those tests was temporary and is not
-distributed here. Production readiness still requires a reproducible container,
-assay-matched resources and PoNs, real-BAM canaries, event-aware calibration and
-frozen classification thresholds. See `DEVELOPMENT_STATE.md`.
+The original temporary runtime has been replaced locally by a persistent,
+isolated installation with fresh LOSS/GAIN/CNLOH integration tests. A candidate
+container pinned to an Ubuntu 24.04 digest was built at commit `809529a` and
+passed the native synthetic/event checks. Its image archive and receipts are a
+90-day private Actions artifact; dependency resolution is not yet a
+bit-reproducible source rebuild or durable release. See
+[`validation/container_freeze_20260921.json`](validation/container_freeze_20260921.json)
+and [`docs/READINESS_20260918.md`](docs/READINESS_20260918.md).
+Production readiness still requires assay-matched resources and PoNs, real-BAM
+canaries, event-aware calibration and frozen classification thresholds. See
+`DEVELOPMENT_STATE.md`.
 
 ## Intended workflow
 
@@ -57,6 +67,20 @@ somatic origin or a TP53 second hit.
   ideal diploid mixture expectations and calibration accounting.
 - `cnv_regions.py`, `cnv_phase_*.py`, `cnv_manta.py`: regional, fragment and
   exploratory SV evidence.
+- `collect_mloy_intervals.py`, `mloy_gate.py`: verified Y interval collection
+  and sensitive, non-negative mLOY screening.
+- `collect_mlox_intervals.py`, `mlox_gate.py`: verified X non-PAR/non-XTR
+  interval collection and sensitive, non-negative mLOX screening.
+- `mloy_calibration.py`: interval-summary Monte Carlo mLOY calibration and
+  depth-only BAM Y thinning; neither mode emits event or negative calls.
+- `mlox_calibration.py`: interval-summary Monte Carlo calibration and depth-only
+  BAM X thinning; neither mode emits event or negative calls.
+- `sex_chromosome_specificity.py`: deterministic held-out refitting of callable
+  panels, normalization and young-null thresholds. TP53-negative retained-signal
+  rates are not mislabeled as false-positive rates.
+- `sex_chromosome_read_calibration.py`: target-only read-level X/Y thinning in
+  memory. It writes no pseudo-BAMs and requires exact fraction-zero agreement
+  with the frozen QC interval sums.
 - `tests/`: synthetic unit, contract and optional native smoke tests.
 - `validation/`: historical synthetic native-test receipts; no patient data.
 
@@ -74,7 +98,12 @@ python -m unittest discover -s tests -q
 Native smoke tests additionally require separately installed and licensed
 CNVkit, samtools, `snp-pileup`, R, DNAcopy, FACETS-CH and `pctGCdata`. Their
 paths are explicit command-line inputs; the test suite does not install them.
-See `docs/REPRODUCIBILITY.md` and `UPSTREAM_AUDIT.md`.
+See `docs/REPRODUCIBILITY.md`, `UPSTREAM_AUDIT.md` and the consolidated
+[`validation/readiness_20260921.json`](validation/readiness_20260921.json).
+
+The sex-chromosome validation order, boundary fraction grids and orthogonal
+array handoff are documented in
+[`docs/SEX_CHROMOSOME_VALIDATION.md`](docs/SEX_CHROMOSOME_VALIDATION.md).
 
 ## Production boundary
 
@@ -91,7 +120,9 @@ Before a 1,329-sample run, the study team must freeze and validate:
   orchestration.
 
 The explicit CLI runs individual development stages only. It intentionally does
-not auto-chain or authorize a cohort launch.
+not auto-chain or authorize a cohort launch. A guarded command template for the
+representative real-BAM pilot is provided in
+[`docs/REAL_BAM_CANARY_COMMANDS.md`](docs/REAL_BAM_CANARY_COMMANDS.md).
 
 ## Data, privacy and citation
 
