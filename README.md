@@ -7,12 +7,14 @@ staged SNV/indel pipeline in `genomic-aging-snv`.
 
 ## Status and validation boundary
 
-This is a **development snapshot, not a production release**. No CNV/LOH
-cohort run has been launched for the 1,329 study samples from this code.
+This is a **development snapshot, not a production release**. No full BAM-level
+CNV/LOH caller run has been launched for the 1,329 study samples from this code.
+Private cohort-wide X/Y interval-summary screening and provisional coverage
+calibration have completed; they are not CNV event calls.
 
-With the pinned Python dependencies installed, the current regression suite
-contains 241 tests. In the isolated `pysam` environment, 233 pass and eight
-optional native/runtime tests are skipped. Historical
+With the pinned Python dependencies installed, the current GitHub Actions run
+executed 241 tests: 234 passed and seven optional native/runtime tests were
+skipped. Historical
 synthetic native tests also exercised CNVkit 0.9.12/DNAcopy, FACETS-CH,
 `snp-pileup`, paired-caller comparison and Parquet export; their receipts are
 retained under `validation/`. Those tests demonstrate implementation and file
@@ -93,7 +95,8 @@ python -m unittest discover -s tests -q
 Native smoke tests additionally require separately installed and licensed
 CNVkit, samtools, `snp-pileup`, R, DNAcopy, FACETS-CH and `pctGCdata`. Their
 paths are explicit command-line inputs; the test suite does not install them.
-See `docs/REPRODUCIBILITY.md` and `UPSTREAM_AUDIT.md`.
+See `docs/REPRODUCIBILITY.md`, `UPSTREAM_AUDIT.md` and the consolidated
+[`validation/readiness_20260921.json`](validation/readiness_20260921.json).
 
 The sex-chromosome validation order, boundary fraction grids and orthogonal
 array handoff are documented in
@@ -114,7 +117,9 @@ Before a 1,329-sample run, the study team must freeze and validate:
   orchestration.
 
 The explicit CLI runs individual development stages only. It intentionally does
-not auto-chain or authorize a cohort launch.
+not auto-chain or authorize a cohort launch. A guarded command template for the
+representative real-BAM pilot is provided in
+[`docs/REAL_BAM_CANARY_COMMANDS.md`](docs/REAL_BAM_CANARY_COMMANDS.md).
 
 ## Data, privacy and citation
 

@@ -1,0 +1,49 @@
+name: container-freeze
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/runtime-resource-readiness
+    paths:
+      - ".github/workflows/container-freeze.yml"
+      - "runtime/**"
+      - "requirements-test.txt"
+      - "SHA256SUMS"
+
+permissions:
+  contents: read
+
+jobs:
+  build-freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      BASE_IMAGE: ubuntu@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and validate frozen candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/cnv-image-freeze-${GITHUB_SHA}"
+          python3 runtime/build_image.py --base "${BASE_IMAGE}" --output "${OUT}"
+          IID="$(cat "${OUT}/image.id")"
+          docker save "${IID}" | zstd -T0 -10 -o "${OUT}/docker-image.tar.zst"
+          sha256sum "${OUT}/docker-image.tar.zst" > "${OUT}/docker-image.tar.zst.sha256"
+          printf '%s\n' "${IID}" > "${OUT}/IMAGE_REFERENCE.txt"
+          {
+            echo "### CNV container freeze"
+            echo
+            echo "- Base: \`${BASE_IMAGE}\`"
+            echo "- Image ID: \`${IID}\`"
+            echo "- Native validation: passed during image build"
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload frozen image and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnv-container-${{ github.sha }}
+          path: ${{ runner.temp }}/cnv-image-freeze-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
