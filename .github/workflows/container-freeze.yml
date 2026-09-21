@@ -9,7 +9,10 @@ on:
       - ".github/workflows/container-freeze.yml"
       - "runtime/**"
       - "requirements-test.txt"
-      - "SHA256SUMS"
+      - "cnv_*.py"
+      - "facets_*.R"
+      - "resources/**"
+      - "tests/**"
 
 permissions:
   contents: read
