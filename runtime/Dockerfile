@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates python3 python3-venv python3-dev build-essential gfortran \
     samtools libhts-dev r-base r-base-dev r-cran-dplyr r-cran-data.table \
     r-cran-ggplot2 r-cran-argparse r-cran-stringr r-cran-patchwork r-cran-glue \
-    r-cran-r.utils libcurl4-openssl-dev libssl-dev libxml2-dev
+    r-cran-r.utils libcurl4-gnutls-dev libssl-dev libxml2-dev
 WORKDIR /opt/cnv
 COPY . /opt/cnv
 RUN python3 runtime/bootstrap_local.py /opt/cnv-runtime
