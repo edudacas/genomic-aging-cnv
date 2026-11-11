@@ -68,16 +68,167 @@ def _load_workbook_metadata(path: Path) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _load_metadata_tsv(path: Path) -> dict[str, dict[str, Any]]:
+    """Tab-separated alternative to the workbook: analysis_id, age_at_collection, study_group.
+
+    A blank age is kept as missing (the sample is retained but never enters the young null).
+    An optional reference_stratum column (for example embryo / postnatal) enables
+    stratum-matched control baselines; blank means no stratum.
+    """
+    import csv
+
+    with path.open(encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream, delimiter="\t")
+        required = {"analysis_id", "age_at_collection", "study_group"}
+        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
+            raise ValueError("metadata TSV columns are missing")
+        result: dict[str, dict[str, Any]] = {}
+        for row in reader:
+            key = str(row["analysis_id"])
+            if key in result:
+                raise ValueError(f"duplicate analysis_id in metadata TSV: {key}")
+            age_text = (row["age_at_collection"] or "").strip()
+            result[key] = {
+                "analysis_id": key,
+                "age_at_collection": float(age_text) if age_text else None,
+                "study_group": row["study_group"],
+                "reference_stratum": (row.get("reference_stratum") or "").strip() or None,
+            }
+    return result
+
+
+def parse_control_groups(control_group: str) -> tuple[frozenset[str], str]:
+    """Comma-separated study_group values that form the control reference."""
+    groups = frozenset(part.strip() for part in control_group.split(",") if part.strip())
+    if not groups:
+        raise ValueError("empty control group")
+    return groups, "+".join(sorted(groups))
+
+
+def select_depth_metric(collection: dict[str, Any], intervals_key: str, depth_metric: str) -> dict[str, Any]:
+    """Return a collection whose depth_over_autosome is the raw or GC-corrected value."""
+    if depth_metric == "raw":
+        return collection
+    if depth_metric != "gc":
+        raise ValueError(f"unknown depth metric: {depth_metric}")
+    if not collection.get("gc_correction"):
+        raise ValueError("collection has no GC correction; rerun the collector with --gc-table")
+    samples = []
+    for sample in collection["samples"]:
+        intervals = {}
+        for interval_id, values in sample[intervals_key].items():
+            if "depth_over_autosome_gc" not in values:
+                raise ValueError(f"{sample['sample_id']}/{interval_id}: GC-corrected depth missing")
+            intervals[interval_id] = {
+                **values,
+                "depth_over_autosome_raw": values["depth_over_autosome"],
+                "depth_over_autosome": values["depth_over_autosome_gc"],
+            }
+        samples.append({**sample, intervals_key: intervals})
+    return {**collection, "samples": samples}
+
+
+def build_control_sets(controls: list[dict[str, Any]], assay: str) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """Control sets with at least MIN_RUN_CONTROLS members; the assay-wide set always exists.
+
+    Keys: ("BATCH_STRATUM", "batch|stratum"), ("BATCH", batch), ("STRATUM", stratum), ("ASSAY", assay).
+    """
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in controls:
+        grouped[("BATCH", row["batch_id"])].append(row)
+        stratum = row.get("reference_stratum")
+        if stratum:
+            grouped[("BATCH_STRATUM", f"{row['batch_id']}|{stratum}")].append(row)
+            grouped[("STRATUM", stratum)].append(row)
+    sets = {key: rows for key, rows in grouped.items() if len(rows) >= MIN_RUN_CONTROLS}
+    sets[("ASSAY", assay)] = controls
+    return sets
+
+
+def choose_control_set(
+    sets: dict[tuple[str, str], list[dict[str, Any]]], row: dict[str, Any], assay: str
+) -> tuple[str, str]:
+    """Most specific available set: batch+stratum, batch, stratum, then assay."""
+    stratum = row.get("reference_stratum")
+    order = []
+    if stratum:
+        order.append(("BATCH_STRATUM", f"{row['batch_id']}|{stratum}"))
+    order.append(("BATCH", row["batch_id"]))
+    if stratum:
+        order.append(("STRATUM", stratum))
+    order.append(("ASSAY", assay))
+    return next(key for key in order if key in sets)
+
+
+SCORE_METRICS = ("median_ratio", "interval_residual")
+
+
+class IntervalReferences:
+    """Per-interval control medians of depth_over_autosome, cached per control set.
+
+    For the interval_residual score the sample itself is left out of its own reference.
+    """
+
+    def __init__(self, intervals_key: str, selected: list[str]):
+        self.intervals_key = intervals_key
+        self.selected = selected
+        self.cache: dict[tuple[tuple[str, str], str | None], dict[str, float]] = {}
+
+    def medians(self, key: tuple[str, str], controls: list[dict[str, Any]], exclude: str | None) -> dict[str, float]:
+        members = [row for row in controls if row["sample_id"] != exclude]
+        cache_key = (key, exclude if len(members) < len(controls) else None)
+        if cache_key not in self.cache:
+            if not members:
+                raise ValueError(f"{key}: empty interval reference")
+            result = {}
+            for interval_id in self.selected:
+                value = statistics.median(
+                    float(row["collection"][self.intervals_key][interval_id]["depth_over_autosome"])
+                    for row in members
+                )
+                if value <= 0:
+                    raise ValueError(f"{key}/{interval_id}: non-positive control median")
+                result[interval_id] = value
+            self.cache[cache_key] = result
+        return self.cache[cache_key]
+
+
+def interval_residual_score(values: dict[str, dict[str, Any]], references: dict[str, float]) -> float | None:
+    """Median over panel intervals of log2(observed / control median); zero-depth intervals skipped."""
+    residuals = [
+        math.log2(float(values[interval_id]["depth_over_autosome"]) / reference)
+        for interval_id, reference in references.items()
+        if float(values[interval_id]["depth_over_autosome"]) > 0
+    ]
+    return statistics.median(residuals) if residuals else None
+
+
+def load_metadata(workbook: Path | None, metadata_tsv: Path | None) -> tuple[dict[str, dict[str, Any]], str, Path]:
+    """Load exactly one metadata source; returns (metadata, receipt key, path)."""
+    if (workbook is None) == (metadata_tsv is None):
+        raise ValueError("provide exactly one of --workbook or --metadata-tsv")
+    if workbook is not None:
+        return _load_workbook_metadata(workbook), "workbook_sha256", workbook
+    return _load_metadata_tsv(metadata_tsv), "metadata_tsv_sha256", metadata_tsv
+
+
 def build_gate(
     collection: dict[str, Any],
     sex_rows: list[dict[str, Any]],
     metadata: dict[str, dict[str, Any]],
     *,
     training_excluded_sample_ids: set[str] | None = None,
+    control_group: str = "TP53_negative",
+    depth_metric: str = "raw",
+    score_metric: str = "median_ratio",
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     training_excluded_sample_ids = set(training_excluded_sample_ids or ())
+    if score_metric not in SCORE_METRICS:
+        raise ValueError(f"unknown score metric: {score_metric}")
     if collection.get("status") != "MLOY_INTERVAL_COLLECTION_COMPLETE":
         raise ValueError("mLOY interval collection is incomplete")
+    control_groups, control_label = parse_control_groups(control_group)
+    collection = select_depth_metric(collection, "eligible_y_intervals", depth_metric)
     collected = {row["sample_id"]: row for row in collection["samples"]}
     if len(collected) != collection.get("selected_samples"):
         raise ValueError("collection membership mismatch")
@@ -96,8 +247,12 @@ def build_gate(
         if analysis_id not in metadata:
             raise ValueError(f"{sample_id}: workbook linkage missing")
         age = metadata[analysis_id].get("age_at_collection")
-        if not isinstance(age, (int, float)) or not math.isfinite(float(age)) or age < 0:
+        if age is None:
+            age_value = None
+        elif not isinstance(age, (int, float)) or not math.isfinite(float(age)) or age < 0:
             raise ValueError(f"{sample_id}: invalid age_at_collection")
+        else:
+            age_value = float(age)
         group = metadata[analysis_id].get("study_group")
         if not group:
             raise ValueError(f"{sample_id}: study_group missing")
@@ -111,7 +266,9 @@ def build_gate(
                 "sex_reported": row["sex_reported"],
                 "sex_inferred": row["sex_inferred"],
                 "study_group": group,
-                "age_at_collection": float(age),
+                "age_at_collection": age_value,
+                "age_status": "AVAILABLE" if age_value is not None else "MISSING_RETAINED",
+                "reference_stratum": metadata[analysis_id].get("reference_stratum"),
                 "mloy_reference_eligible": bool(
                     row.get("sex_gate_status") == "PASS" and (reported_male or inferred_male)
                 ),
@@ -138,9 +295,20 @@ def build_gate(
             "minimum_sample_panel_completeness": MIN_SAMPLE_PANEL_COMPLETENESS,
         },
         "normalization_rule": (
-            "TP53-negative male batch median when >=5 eligible controls; "
-            "otherwise TP53-negative male assay median"
+            f"{control_label} male median of the most specific control set with >=5 eligible "
+            "controls: batch+reference stratum, batch, reference stratum, else assay "
+            "(the stratum levels apply only when metadata supplies reference_stratum)"
         ),
+        "control_group": control_label,
+        "depth_metric": depth_metric,
+        "score_metric": score_metric,
+        "score_rule": (
+            "mLRR_Y = median(log2(interval_mean_depth/autosomal_mean_depth)) - control median"
+            if score_metric == "median_ratio" else
+            "mLRR_Y = median over panel intervals of log2(depth_over_autosome / control interval "
+            "median), with the sample left out of its own control set"
+        ),
+        "gc_correction": collection.get("gc_correction") if depth_metric == "gc" else None,
         "retention_policy": (
             "sex inference never removes reported males or sex-chromosome anomalies; "
             "no sample is labeled negative before calibration"
@@ -226,19 +394,15 @@ def build_gate(
         controls = [
             row for row in eligible
             if (
-                row["study_group"] == "TP53_negative"
+                row["study_group"] in control_groups
                 and row["mloy_reference_eligible"]
                 and not row["held_out_specificity"]
             )
         ]
         if len(controls) < 6:
-            raise ValueError(f"{assay}: insufficient eligible TP53-negative male controls")
-        assay_control_median = _median(
-            [row["raw_log2_y_auto_median"] for row in controls], f"{assay} controls"
-        )
-        controls_by_batch: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for row in controls:
-            controls_by_batch[row["batch_id"]].append(row)
+            raise ValueError(f"{assay}: insufficient eligible {control_label} male controls")
+        control_sets = build_control_sets(controls, assay)
+        references = IntervalReferences("eligible_y_intervals", selected)
 
         for row in assay_rows:
             row["normalization_scope"] = None
@@ -256,25 +420,30 @@ def build_gate(
             row["fraction_targets_below_minus_0_10"] = None
             if row["metric_status"] != "ELIGIBLE":
                 continue
-            batch_controls = controls_by_batch.get(row["batch_id"], [])
-            if len(batch_controls) >= MIN_RUN_CONTROLS:
-                baseline = _median(
-                    [value["raw_log2_y_auto_median"] for value in batch_controls],
-                    f"{assay}/{row['batch_id']} controls",
+            key = choose_control_set(control_sets, row, assay)
+            interval_controls = control_sets[key]
+            baseline = _median(
+                [value["raw_log2_y_auto_median"] for value in interval_controls],
+                f"{assay}/{key} controls",
+            )
+            scope = f"{key[0]}_{control_label.upper()}_MALES"
+            control_n = len(interval_controls)
+            row["normalization_leave_one_out"] = False
+            if score_metric == "interval_residual":
+                interval_refs = references.medians(key, interval_controls, row["sample_id"])
+                mlrr = interval_residual_score(row["collection"]["eligible_y_intervals"], interval_refs)
+                row["normalization_leave_one_out"] = any(
+                    value["sample_id"] == row["sample_id"] for value in interval_controls
                 )
-                scope = "BATCH_TP53_NEGATIVE_MALES"
-                control_n = len(batch_controls)
             else:
-                baseline = assay_control_median
-                scope = "ASSAY_TP53_NEGATIVE_MALES"
-                control_n = len(controls)
-            mlrr = row["raw_log2_y_auto_median"] - baseline
+                mlrr = row["raw_log2_y_auto_median"] - baseline
             weighted_baseline = _median(
-                [value["raw_log2_y_auto_weighted"] for value in (batch_controls if len(batch_controls) >= MIN_RUN_CONTROLS else controls)],
-                f"{assay}/{row['batch_id']} zero-aware controls",
+                [value["raw_log2_y_auto_weighted"] for value in interval_controls],
+                f"{assay}/{key} zero-aware controls",
             )
             zero_aware_mlrr = row["raw_log2_y_auto_weighted"] - weighted_baseline
             row["normalization_scope"] = scope
+            row["normalization_set"] = key[1]
             row["normalization_control_n"] = control_n
             row["normalization_median"] = baseline
             row["mLRR_Y"] = mlrr
@@ -284,7 +453,6 @@ def build_gate(
                 0.0, min(1.0, 1.0 - 2.0**zero_aware_mlrr)
             )
 
-            interval_controls = batch_controls if len(batch_controls) >= MIN_RUN_CONTROLS else controls
             residuals: list[float] = []
             below_zero = below_005 = below_010 = 0
             values = row["collection"]["eligible_y_intervals"]
@@ -317,8 +485,11 @@ def build_gate(
             row["fraction_targets_below_minus_0_05"] = below_005 / len(selected)
             row["fraction_targets_below_minus_0_10"] = below_010 / len(selected)
 
-        young_n = math.ceil(len(controls) / 3)
-        young = sorted(controls, key=lambda row: (row["age_at_collection"], row["sample_id"]))[:young_n]
+        age_controls = [row for row in controls if row["age_at_collection"] is not None]
+        if len(age_controls) < 6:
+            raise ValueError(f"{assay}: insufficient age-annotated {control_label} male controls")
+        young_n = math.ceil(len(age_controls) / 3)
+        young = sorted(age_controls, key=lambda row: (row["age_at_collection"], row["sample_id"]))[:young_n]
         null_values = [row["mLRR_Y"] for row in young]
         null_median = _median(null_values, f"{assay} young null")
         null_mad = _median([abs(value - null_median) for value in null_values], f"{assay} young MAD")
@@ -412,11 +583,19 @@ def build_gate(
         },
         "retained_candidate_age_range": (
             [
-                min(row["age_at_collection"] for row in retained_candidates),
-                max(row["age_at_collection"] for row in retained_candidates),
+                min(row["age_at_collection"] for row in aged_candidates),
+                max(row["age_at_collection"] for row in aged_candidates),
             ]
-            if retained_candidates else None
+            if (aged_candidates := [r for r in retained_candidates if r["age_at_collection"] is not None])
+            else None
         ),
+        "missing_age_sample_n": sum(row["age_at_collection"] is None for row in clean_rows),
+        "control_group": control_label,
+        "depth_metric": depth_metric,
+        "score_metric": score_metric,
+        "normalization_scope_counts": dict(sorted(
+            Counter(row["normalization_scope"] for row in clean_rows if row["normalization_scope"]).items()
+        )),
         "manual_review_sample_ids": sorted(
             row["sample_id"]
             for row in clean_rows
@@ -452,7 +631,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--collection", type=Path, required=True)
     parser.add_argument("--sex-cohort", type=Path, required=True)
-    parser.add_argument("--workbook", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--workbook", type=Path)
+    source.add_argument("--metadata-tsv", type=Path,
+                        help="TSV with analysis_id, age_at_collection, study_group")
+    parser.add_argument("--control-group", default="TP53_negative",
+                        help="study_group value used as the control reference")
+    parser.add_argument("--depth-metric", choices=("raw", "gc"), default="raw",
+                        help="gc uses depth_over_autosome_gc from a collection built with --gc-table")
+    parser.add_argument("--score-metric", choices=SCORE_METRICS, default="median_ratio",
+                        help="interval_residual scores each interval against its control median (leave-one-out)")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--expected-sha256")
     args = parser.parse_args()
@@ -463,20 +651,23 @@ def main() -> int:
     with gzip.open(args.collection, "rt", encoding="utf-8") as stream:
         collection = json.load(stream)
     sex_rows = json.loads(args.sex_cohort.read_text(encoding="utf-8"))
-    metadata = _load_workbook_metadata(args.workbook)
-    rows, summary, panel = build_gate(collection, sex_rows, metadata)
+    metadata, metadata_key, metadata_path = load_metadata(args.workbook, args.metadata_tsv)
+    rows, summary, panel = build_gate(
+        collection, sex_rows, metadata, control_group=args.control_group, depth_metric=args.depth_metric,
+        score_metric=args.score_metric,
+    )
     summary.update(
         {
             "collection_sha256": observed,
             "sex_cohort_sha256": sha256_file(args.sex_cohort),
-            "workbook_sha256": sha256_file(args.workbook),
+            metadata_key: sha256_file(metadata_path),
         }
     )
     panel.update(
         {
             "collection_sha256": observed,
             "sex_cohort_sha256": summary["sex_cohort_sha256"],
-            "workbook_sha256": summary["workbook_sha256"],
+            metadata_key: summary[metadata_key],
         }
     )
     _write_json(args.output_dir / "mloy.metrics.PRIVATE.json", rows)
