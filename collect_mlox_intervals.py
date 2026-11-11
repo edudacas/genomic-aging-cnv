@@ -21,6 +21,12 @@ from typing import Any
 
 from collect_mloy_intervals import (
     AUTOSOMES,
+    GC_METHOD,
+    GcAccumulator,
+    apply_gc,
+    load_gc_table,
+    mask_exclusions,
+    validate_mask,
     MEASURES,
     SAFE_SAMPLE,
     _add,
@@ -32,23 +38,10 @@ from collect_mloy_intervals import (
 )
 
 
-def _load_x_mask(path: Path) -> tuple[dict[str, Any], list[tuple[int, int, str]]]:
+def _load_x_mask(path: Path) -> tuple[dict[str, Any], list[tuple[int, int, str]], frozenset[str]]:
     mask = json.loads(path.read_text(encoding="utf-8"))
-    if mask.get("assembly") != "GRCh38" or mask.get("coordinate_system") != "0-based-half-open":
-        raise ValueError("mask assembly/coordinate mismatch")
-    if mask.get("xtr", {}).get("status") != "FROZEN_FOR_FUTURE_RECOMPUTATION_NOT_USED_IN_CURRENT_SEX_GATE":
-        raise ValueError("XTR resource is not frozen")
-    regions: list[tuple[int, int, str]] = []
-    for start, end in mask["par"]["chrX"]:
-        regions.append((int(start), int(end), "PAR"))
-    for start, end in mask["xtr"]["chrX"]:
-        regions.append((int(start), int(end), "XTR"))
-    regions.sort()
-    if any(not 0 <= start < end for start, end, _ in regions):
-        raise ValueError("invalid X exclusion interval")
-    if any(a[1] > b[0] for a, b in zip(regions, regions[1:])):
-        raise ValueError("overlapping X exclusions")
-    return mask, regions
+    autosomes = validate_mask(mask)
+    return mask, mask_exclusions(mask, "chrX"), autosomes
 
 
 def _process_sample(
@@ -57,6 +50,8 @@ def _process_sample(
     binding: dict[str, Any],
     fingerprint: str,
     x_exclusions: list[tuple[int, int, str]],
+    autosomes: frozenset[str] = frozenset(AUTOSOMES),
+    gc_table: dict[tuple[str, int, int], float] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if not SAFE_SAMPLE.fullmatch(sample_id):
         raise ValueError("unsafe sample identifier")
@@ -87,6 +82,7 @@ def _process_sample(
         raise ValueError(f"{sample_id}: invalid interval gzip") from exc
 
     autosomal = _zero_totals()
+    gc = GcAccumulator(gc_table) if gc_table is not None else None
     parents: dict[tuple[int, int], dict[str, int]] = {}
     parent_segments: dict[tuple[int, int], list[tuple[int, int]]] = {}
     reader = csv.DictReader(io.StringIO(text), delimiter="\t")
@@ -95,8 +91,10 @@ def _process_sample(
         raise ValueError(f"{sample_id}: interval schema mismatch")
     for row in reader:
         chrom = row["chrom"]
-        if chrom in AUTOSOMES:
+        if chrom in autosomes:
             _add(autosomal, row)
+            if gc is not None:
+                gc.add_autosome(row)
             continue
         if chrom != "chrX":
             continue
@@ -108,12 +106,15 @@ def _process_sample(
         parents.setdefault(key, _zero_totals())
         parent_segments.setdefault(key, []).append((start, end))
         _add(parents[key], row)
+        if gc is not None:
+            gc.add_segment(key, row)
 
     if autosomal["territory_bases"] <= 0 or autosomal["depth_sum"] <= 0:
         raise ValueError(f"{sample_id}: empty autosomal denominator")
     auto_mean = autosomal["depth_sum"] / autosomal["territory_bases"]
     catalog: list[dict[str, Any]] = []
     intervals: dict[str, dict[str, Any]] = {}
+    interval_keys: dict[str, tuple[int, int]] = {}
     for (start, end), totals in sorted(parents.items()):
         segments = sorted(parent_segments[(start, end)])
         if any(a[1] != b[0] for a, b in zip(segments, segments[1:])):
@@ -142,17 +143,28 @@ def _process_sample(
                 "mean_depth": mean_depth,
                 "depth_over_autosome": mean_depth / auto_mean,
             }
+            interval_keys[interval_id] = (start, end)
 
-    return ({
+    sample = {
         "sample_id": sample_id,
         "qc_receipt_sha256": binding["receipt_sha256"],
         "coverage_intervals_sha256": observed_digest,
         "autosomal": {**autosomal, "mean_depth": auto_mean},
         "eligible_x_intervals": intervals,
-    }, catalog)
+    }
+    if gc is not None:
+        sample["gc_curve"] = apply_gc(intervals, interval_keys, gc, auto_mean)
+    return sample, catalog
 
 
-def collect(stages: Path, mask_path: Path, destination: Path, expected: int, workers: int) -> dict[str, Any]:
+def collect(
+    stages: Path,
+    mask_path: Path,
+    destination: Path,
+    expected: int,
+    workers: int,
+    gc_table_path: Path | None = None,
+) -> dict[str, Any]:
     stages = stages.resolve()
     marker = stages / "QC_COMPLETE.json"
     initial_marker_hash = sha256_file(marker)
@@ -160,8 +172,9 @@ def collect(stages: Path, mask_path: Path, destination: Path, expected: int, wor
     samples = receipt.get("samples", {})
     if receipt.get("status") != "QC_COMPLETE" or len(samples) != expected:
         raise ValueError("QC completion/membership mismatch")
-    mask, x_exclusions = _load_x_mask(mask_path)
+    mask, x_exclusions, autosomes = _load_x_mask(mask_path)
     mask_hash = sha256_file(mask_path)
+    gc_table = load_gc_table(gc_table_path) if gc_table_path is not None else None
 
     results: dict[str, dict[str, Any]] = {}
     reference_catalog: list[dict[str, Any]] | None = None
@@ -169,7 +182,7 @@ def collect(stages: Path, mask_path: Path, destination: Path, expected: int, wor
         futures = {
             executor.submit(
                 _process_sample, stages, sample_id, binding,
-                receipt.get("fingerprint"), x_exclusions,
+                receipt.get("fingerprint"), x_exclusions, autosomes, gc_table,
             ): sample_id
             for sample_id, binding in sorted(samples.items())
         }
@@ -213,6 +226,8 @@ def collect(stages: Path, mask_path: Path, destination: Path, expected: int, wor
         "conservative_overexcluded_bases": sum(r["conservative_overexcluded_bases"] for r in excluded),
         "samples": [results[sid] for sid in sorted(results)],
     }
+    if gc_table_path is not None:
+        payload["gc_correction"] = {"table_sha256": sha256_file(gc_table_path), "method": GC_METHOD}
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("xb") as raw:
         os.chmod(destination, 0o600)
@@ -238,8 +253,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected", type=int, default=1329)
     parser.add_argument("--workers", type=int, default=4, choices=range(1, 5))
+    parser.add_argument("--gc-table", type=Path,
+                        help="optional interval GC TSV (interval_gc.py); adds depth_over_autosome_gc")
     args = parser.parse_args()
-    collect(args.stages, args.mask, args.output, args.expected, args.workers)
+    collect(args.stages, args.mask, args.output, args.expected, args.workers, args.gc_table)
     return 0
 
 

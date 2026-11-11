@@ -19,6 +19,17 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from mloy_gate import (
+    SCORE_METRICS,
+    IntervalReferences,
+    build_control_sets,
+    interval_residual_score,
+    choose_control_set,
+    load_metadata,
+    parse_control_groups,
+    select_depth_metric,
+)
+
 
 GATE_VERSION = "mlox-sensitive-retention-v1"
 CALLABLE_BASE_FRACTION = 0.80
@@ -112,10 +123,17 @@ def build_gate(
     metadata: dict[str, dict[str, Any]],
     *,
     training_excluded_sample_ids: set[str] | None = None,
+    control_group: str = "TP53_negative",
+    depth_metric: str = "raw",
+    score_metric: str = "median_ratio",
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     training_excluded_sample_ids = set(training_excluded_sample_ids or ())
+    if score_metric not in SCORE_METRICS:
+        raise ValueError(f"unknown score metric: {score_metric}")
     if collection.get("status") != "MLOX_INTERVAL_COLLECTION_COMPLETE":
         raise ValueError("mLOX interval collection is incomplete")
+    control_groups, control_label = parse_control_groups(control_group)
+    collection = select_depth_metric(collection, "eligible_x_intervals", depth_metric)
     collected = {row["sample_id"]: row for row in collection["samples"]}
     sex = {row["sample_id"]: row for row in sex_rows}
     if len(collected) != collection.get("selected_samples") or set(collected) != set(sex):
@@ -145,6 +163,7 @@ def build_gate(
             "study_group": info.get("study_group"),
             "age_at_collection": age_value,
             "age_status": "AVAILABLE" if age_value is not None else "MISSING_RETAINED",
+            "reference_stratum": info.get("reference_stratum"),
             "collection": collected[sample_id],
             "held_out_specificity": sample_id in training_excluded_sample_ids,
         }
@@ -185,6 +204,21 @@ def build_gate(
         "cell_fraction_model": "female*(1-f)+male*f on linear X/autosome depth",
         "retention_policy": "reported females and sex-chromosome anomalies are never excluded by sex inference",
         "event_call_policy": "BLOCKED_PENDING_BAM_READ_SUBSTITUTION_CALIBRATION",
+        "control_group": control_label,
+        "normalization_rule": (
+            "female and male baselines each from the most specific control set with >=5 "
+            "eligible controls: batch+reference stratum, batch, reference stratum, else assay"
+        ),
+        "depth_metric": depth_metric,
+        "score_metric": score_metric,
+        "score_rule": (
+            "mLRR_X = median(log2(interval_mean_depth/autosomal_mean_depth)) - female control median"
+            if score_metric == "median_ratio" else
+            "mLRR_X = median over panel intervals of log2(depth_over_autosome / female control "
+            "interval median), sample left out of its own control set; f from the male/female "
+            "baseline ratio under the same read-substitution model"
+        ),
+        "gc_correction": collection.get("gc_correction") if depth_metric == "gc" else None,
         "assays": {},
     }
     output: list[dict[str, Any]] = []
@@ -230,36 +264,20 @@ def build_gate(
         female_controls = [
             r for r in eligible_females
             if (
-                r["study_group"] == "TP53_negative"
+                r["study_group"] in control_groups
                 and r["mlox_reference_eligible"]
                 and not r["held_out_specificity"]
             )
         ]
         male_controls = [
             r for r in reference_males
-            if r["metric_status"] == "ELIGIBLE" and r["study_group"] == "TP53_negative"
+            if r["metric_status"] == "ELIGIBLE" and r["study_group"] in control_groups
         ]
         if len(female_controls) < 6 or len(male_controls) < 6:
-            raise ValueError(f"{assay}: insufficient TP53-negative sex-specific controls")
-        female_by_batch: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        male_by_batch: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for row in female_controls:
-            female_by_batch[row["batch_id"]].append(row)
-        for row in male_controls:
-            male_by_batch[row["batch_id"]].append(row)
-
-        female_control_sets: dict[tuple[str, str], list[dict[str, Any]]] = {
-            ("ASSAY", assay): female_controls
-        }
-        male_control_sets: dict[tuple[str, str], list[dict[str, Any]]] = {
-            ("ASSAY", assay): male_controls
-        }
-        for batch_id, batch_rows in female_by_batch.items():
-            if len(batch_rows) >= MIN_RUN_CONTROLS:
-                female_control_sets[("BATCH", batch_id)] = batch_rows
-        for batch_id, batch_rows in male_by_batch.items():
-            if len(batch_rows) >= MIN_RUN_CONTROLS:
-                male_control_sets[("BATCH", batch_id)] = batch_rows
+            raise ValueError(f"{assay}: insufficient {control_label} sex-specific controls")
+        female_control_sets = build_control_sets(female_controls, assay)
+        references = IntervalReferences("eligible_x_intervals", selected)
+        male_control_sets = build_control_sets(male_controls, assay)
 
         female_log_baselines = {
             key: _median(
@@ -302,16 +320,8 @@ def build_gate(
             })
             if row["metric_status"] != "ELIGIBLE":
                 continue
-            female_key = (
-                ("BATCH", row["batch_id"])
-                if ("BATCH", row["batch_id"]) in female_control_sets
-                else ("ASSAY", assay)
-            )
-            male_key = (
-                ("BATCH", row["batch_id"])
-                if ("BATCH", row["batch_id"]) in male_control_sets
-                else ("ASSAY", assay)
-            )
+            female_key = choose_control_set(female_control_sets, row, assay)
+            male_key = choose_control_set(male_control_sets, row, assay)
             female_reference = female_control_sets[female_key]
             male_reference = male_control_sets[male_key]
             female_baseline = female_log_baselines[female_key]
@@ -322,16 +332,29 @@ def build_gate(
             if not female_linear > male_linear > 0:
                 raise ValueError(f"{assay}: invalid female/male X dosage baselines")
             row["normalization_scope"] = (
-                f"FEMALE_{female_key[0]}_MALE_{male_key[0]}_TP53_NEGATIVE"
+                f"FEMALE_{female_key[0]}_MALE_{male_key[0]}_{control_label.upper()}"
             )
+            row["female_normalization_set"] = female_key[1]
+            row["male_dosage_set"] = male_key[1]
             row["female_normalization_control_n"] = len(female_reference)
             row["male_dosage_control_n"] = len(male_reference)
             row["female_normalization_median"] = female_baseline
             row["male_dosage_median"] = male_baseline
-            row["mLRR_X"] = row["raw_log2_x_auto_median"] - female_baseline
-            row["f_LOX_interpretive"] = max(
-                0.0, min(1.0, (female_linear - observed_linear) / (female_linear - male_linear))
-            )
+            row["normalization_leave_one_out"] = False
+            if score_metric == "interval_residual":
+                interval_refs = references.medians(female_key, female_reference, row["sample_id"])
+                score = interval_residual_score(row["collection"]["eligible_x_intervals"], interval_refs)
+                row["mLRR_X"] = score
+                row["normalization_leave_one_out"] = any(
+                    r["sample_id"] == row["sample_id"] for r in female_reference
+                )
+                male_relative = male_linear / female_linear
+                row["f_LOX_interpretive"] = max(0.0, min(1.0, (1.0 - 2.0 ** score) / (1.0 - male_relative)))
+            else:
+                row["mLRR_X"] = row["raw_log2_x_auto_median"] - female_baseline
+                row["f_LOX_interpretive"] = max(
+                    0.0, min(1.0, (female_linear - observed_linear) / (female_linear - male_linear))
+                )
 
             residuals: list[float] = []
             below_zero = below_005 = below_010 = 0
@@ -447,6 +470,12 @@ def build_gate(
         "reference_female_samples": sum(r["mlox_reference_eligible"] for r in clean_rows),
         "sex_chromosome_anomaly_review_samples": sum(r["sex_chromosome_anomaly_review"] for r in clean_rows),
         "age_status_counts": dict(sorted(Counter(r["age_status"] for r in clean_rows).items())),
+        "control_group": control_label,
+        "depth_metric": depth_metric,
+        "score_metric": score_metric,
+        "normalization_scope_counts": dict(sorted(
+            Counter(r["normalization_scope"] for r in clean_rows if r.get("normalization_scope")).items()
+        )),
         "metric_status_counts": dict(sorted(Counter(r["metric_status"] for r in clean_rows).items())),
         "screen_tier_counts": dict(sorted(tiers.items())),
         "retained_candidate_by_assay_and_group": {
@@ -476,7 +505,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--collection", type=Path, required=True)
     parser.add_argument("--sex-cohort", type=Path, required=True)
-    parser.add_argument("--workbook", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--workbook", type=Path)
+    source.add_argument("--metadata-tsv", type=Path,
+                        help="TSV with analysis_id, age_at_collection, study_group")
+    parser.add_argument("--control-group", default="TP53_negative",
+                        help="study_group value used as the control reference")
+    parser.add_argument("--depth-metric", choices=("raw", "gc"), default="raw",
+                        help="gc uses depth_over_autosome_gc from a collection built with --gc-table")
+    parser.add_argument("--score-metric", choices=SCORE_METRICS, default="median_ratio",
+                        help="interval_residual scores each interval against its control median (leave-one-out)")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--expected-sha256")
     args = parser.parse_args()
@@ -486,17 +524,20 @@ def main() -> int:
     with gzip.open(args.collection, "rt", encoding="utf-8") as stream:
         collection = json.load(stream)
     sex_rows = json.loads(args.sex_cohort.read_text(encoding="utf-8"))
-    metadata = _load_workbook_metadata(args.workbook)
-    rows, summary, panel = build_gate(collection, sex_rows, metadata)
+    metadata, metadata_key, metadata_path = load_metadata(args.workbook, args.metadata_tsv)
+    rows, summary, panel = build_gate(
+        collection, sex_rows, metadata, control_group=args.control_group, depth_metric=args.depth_metric,
+        score_metric=args.score_metric,
+    )
     summary.update({
         "collection_sha256": observed,
         "sex_cohort_sha256": sha256_file(args.sex_cohort),
-        "workbook_sha256": sha256_file(args.workbook),
+        metadata_key: sha256_file(metadata_path),
     })
     panel.update({
         "collection_sha256": observed,
         "sex_cohort_sha256": summary["sex_cohort_sha256"],
-        "workbook_sha256": summary["workbook_sha256"],
+        metadata_key: summary[metadata_key],
     })
     _write_json(args.output_dir / "mlox.metrics.PRIVATE.json", rows)
     _write_json(args.output_dir / "mlox.summary.json", summary)

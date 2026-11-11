@@ -1,0 +1,31 @@
+{
+  "assembly": "GRCm38",
+  "coordinate_system": "0-based-half-open",
+  "schema_version": 1,
+  "species": "Mus musculus",
+  "autosomes": ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10",
+                "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19"],
+  "sex_inference_territory": "X_NONPAR_EXCLUDING_PAR_ONLY",
+  "sex_inference_uses_y": false,
+  "par": {
+    "chrX": [[169969758, 171031299]],
+    "chrY": [[90745844, 91644698]],
+    "source": "Ensembl GRCm38 pseudoautosomal region (chrX:169,969,759-171,031,299; chrY:90,745,845-91,644,698), converted from 1-based inclusive to 0-based half-open"
+  },
+  "xtr": {
+    "chrX": [],
+    "chrY": [],
+    "source": "The mouse genome has no X-transposed region; empty by design",
+    "status": "FROZEN_FOR_FUTURE_RECOMPUTATION_NOT_USED_IN_CURRENT_SEX_GATE"
+  },
+  "additional_exclusions": {
+    "chrY": [
+      {"start": 4000000, "end": 90745844, "label": "AMPLICONIC_YQ",
+       "reason": "Mouse Yq is ampliconic (Sly, Ssty1/2, Srsy multicopy families); copy number varies between strains and MAPQ>=20 depth is near zero, so it is not a single-copy dosage readout"}
+    ]
+  },
+  "notes": [
+    "Single-copy mouse Yp (Kdm5d, Eif2s3y, Uty, Ddx3y, Usp9y, Zfy1/2, Sry) lies below 4 Mb in GRCm38; multicopy Yp clusters (e.g. Rbmy) are removed by the gates' per-interval callability rule, not by this mask.",
+    "The X compartment depends only on the PAR boundary at the distal end of chrX."
+  ]
+}
